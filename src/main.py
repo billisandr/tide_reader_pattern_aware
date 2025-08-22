@@ -23,7 +23,7 @@ def load_config(config_path='config.yaml'):
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
     
- def get_directory_with_gui():
+def get_directory_with_gui():
     """Show directory selection dialog."""      
     root = tk.Tk()     
     root.withdraw()  #Hide main window
@@ -46,7 +46,7 @@ def main():
               logger.error("No directory selected")
               sys.exit(1)
           input_dir = Path(input_dir_str)
-      else:
+    else:
           input_dir = Path(os.path.join(os.getcwd(), 'data', 'input'))
     
     # Load configuration
