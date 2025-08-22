@@ -72,6 +72,13 @@ class DatabaseManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
+        # Debug: Show all processed images in database
+        cursor.execute('SELECT image_path FROM processed_images')
+        processed_paths = cursor.fetchall()
+        self.logger.debug(f"Database contains {len(processed_paths)} processed images:")
+        for path in processed_paths[:5]:  # Show first 5
+            self.logger.debug(f"  - {path[0]}")
+        
         cursor.execute('''
             SELECT COUNT(*) FROM processed_images
             WHERE image_path = ?
@@ -80,6 +87,7 @@ class DatabaseManager:
         count = cursor.fetchone()[0]
         conn.close()
         
+        self.logger.debug(f"Checking path: {image_path} -> processed: {count > 0}")
         return count > 0
     
     def get_measurements(self, start_date=None, end_date=None):
