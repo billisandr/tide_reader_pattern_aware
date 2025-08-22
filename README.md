@@ -1,6 +1,6 @@
-# CAMERA-BASED TIDE-LEVEL MEASUREMENT  
+# Tide/Water level detection and measurement (opencv-based) 
 
-Automated water level detection and measurement system using computer vision, designed for Raspberry Pi captured images with fixed camera-scale setup.
+Automated water/tide level detection and measurement system using computer vision, designed for Raspberry Pi captured images with fixed camera-scale setup.
 
 > Disclaimer: This work is part of a non-funded prototype research idea condacted  at the [SenseLAB](http://senselab.tuc.gr/) of the [TUC](https://www.tuc.gr/el/archi).
 
