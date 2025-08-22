@@ -36,6 +36,9 @@ def get_directory_with_gui():
 
 def main():
     """Main application loop."""
+    # Load environment variables from .env file
+    load_dotenv()
+    
     # Setup logging
     setup_logging()
     logger = logging.getLogger(__name__)
