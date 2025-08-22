@@ -64,8 +64,12 @@ def main():
     logger.info(f"Directory exists: {input_dir.exists()}")
     
     if input_dir.exists():
-        file_count = len(list(input_dir.glob("*.jpg")) + list(input_dir.glob("*.JPG")) + list(input_dir.glob("*.png")) + list(input_dir.glob("*.PNG")))
-        logger.info(f"Found {file_count} image files in directory")
+        # Use set to avoid counting same files twice (case insensitive on Windows)
+        image_files = set()
+        for pattern in ["*.jpg", "*.JPG", "*.png", "*.PNG", "*.jpeg", "*.JPEG"]:
+            image_files.update(input_dir.glob(pattern))
+        logger.info(f"Found {len(image_files)} unique image files in directory")
+        logger.debug(f"Image files: {[f.name for f in image_files]}")
     
     # Load configuration
     config = load_config()

@@ -35,12 +35,14 @@ def get_unprocessed_images(input_dir, processed_dir, db_manager):
     input_path = Path(input_dir)
     processed_path = Path(processed_dir)
     
-    # Get all image files
+    # Get all image files (use set to avoid duplicates on case-insensitive filesystems)
     image_extensions = ['*.jpg', '*.jpeg', '*.png', '*.JPG', '*.JPEG', '*.PNG']
-    all_images = []
+    all_images_set = set()
     
     for ext in image_extensions:
-        all_images.extend(input_path.glob(ext))
+        all_images_set.update(input_path.glob(ext))
+    
+    all_images = list(all_images_set)
     
     # Sort by filename (assuming timestamp in filename)
     all_images.sort(key=lambda x: extract_timestamp(x.name) or x.stat().st_mtime)
