@@ -64,3 +64,7 @@ temp/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Documentation drafts
+testing_issues_documentation.md
+system_documentation_draft.md
