@@ -44,14 +44,28 @@ def main():
     logger = logging.getLogger(__name__)
     
     # Ask user to specify the input photos directory
+    logger.info(f"USE_GUI_SELECTOR environment variable: {os.environ.get('USE_GUI_SELECTOR', 'not set')}")
+    
     if os.environ.get('USE_GUI_SELECTOR', 'false').lower() == 'true':
+          logger.info("Opening GUI directory selector...")
           input_dir_str = get_directory_with_gui()
+          logger.info(f"GUI returned directory: '{input_dir_str}'")
+          
           if not input_dir_str:
-              logger.error("No directory selected")
+              logger.error("No directory selected via GUI")
               sys.exit(1)
           input_dir = Path(input_dir_str)
+          logger.info(f"Using GUI-selected directory: {input_dir}")
     else:
           input_dir = Path(os.path.join(os.getcwd(), 'data', 'input'))
+          logger.info(f"Using default directory: {input_dir}")
+    
+    logger.info(f"Final input directory: {input_dir.absolute()}")
+    logger.info(f"Directory exists: {input_dir.exists()}")
+    
+    if input_dir.exists():
+        file_count = len(list(input_dir.glob("*.jpg")) + list(input_dir.glob("*.JPG")) + list(input_dir.glob("*.png")) + list(input_dir.glob("*.PNG")))
+        logger.info(f"Found {file_count} image files in directory")
     
     # Load configuration
     config = load_config()
