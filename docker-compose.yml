@@ -5,6 +5,7 @@ services:
     build: .
     container_name: water-level-measurement
     volumes:
+      - C:/tide-recorder-server-https/uploads:/app/data/input:ro  # Read-only mount
       - ./data:/app/data
       - ./logs:/app/logs
       - ./config.yaml:/app/config.yaml

@@ -10,22 +10,44 @@ import logging
 from pathlib import Path
 from datetime import datetime
 import yaml
+import tkinter as tk
 
 from water_level_detector import WaterLevelDetector
 from calibration import CalibrationManager
 from database import DatabaseManager
 from utils import setup_logging, get_unprocessed_images
+from tkinter import filedialog
 
 def load_config(config_path='config.yaml'):
     """Load configuration from YAML file."""
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
+    
+ def get_directory_with_gui():
+    """Show directory selection dialog."""      
+    root = tk.Tk()     
+    root.withdraw()  #Hide main window
+    directory = filedialog.askdirectory(        
+        title="Select input directory for photos"
+    )
+    root.destroy()     
+    return directory 
 
 def main():
     """Main application loop."""
     # Setup logging
     setup_logging()
     logger = logging.getLogger(__name__)
+    
+    # Ask user to specify the input photos directory
+    if os.environ.get('USE_GUI_SELECTOR', 'false').lower() == 'true':
+          input_dir_str = get_directory_with_gui()
+          if not input_dir_str:
+              logger.error("No directory selected")
+              sys.exit(1)
+          input_dir = Path(input_dir_str)
+      else:
+          input_dir = Path(os.path.join(os.getcwd(), 'data', 'input'))
     
     # Load configuration
     config = load_config()
@@ -55,7 +77,7 @@ def main():
     
     # Processing loop
     process_interval = int(os.environ.get('PROCESS_INTERVAL', 60))
-    input_dir = Path(os.path.join(os.getcwd(), 'data', 'input'))
+    #input_dir = Path(os.path.join(os.getcwd(), 'data', 'input'))
     processed_dir = Path(os.path.join(os.getcwd(), 'data', 'processed'))
     
     logger.info(f"Starting main processing loop (interval: {process_interval}s)")

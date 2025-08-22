@@ -29,6 +29,53 @@ This work borrows ideas and software from the following open-source github repos
 - Flask app with `app.py` configured for HTTPS
 - OpenSSL (available via Git Bash, WSL, or native install)
 
+## Issues to be addressed/documented
+  docker run -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix your-image
+
+Without an emulated calibration file, the interactive calibration process works as
+  follows:
+
+  1. Trigger Calibration Mode
+
+  Set environment variable: CALIBRATION_MODE=true and run the application.
+
+  2. Image Selection
+
+  The system looks for calibration images in /app/data/calibration/ directory (.jpg or
+  .png files) and uses the first one found.
+
+  3. Two Calibration Methods
+
+  Method A: Known Scale Height (Automatic)
+  - If config.yaml has scale.total_height set (like your 100.0cm)
+  - System automatically detects the scale using edge detection
+  - Finds the tallest vertical object (assumed to be the scale)
+  - Calculates pixels_per_cm = detected_pixels / known_height_cm
+
+  Method B: Interactive Calibration (Manual)
+  - If no known height is configured
+  - Opens OpenCV window showing the calibration image
+  - User clicks on two points: top and bottom of the scale
+  - System prompts: "Enter the actual height in cm:"
+  - User types the real-world distance between clicked points
+  - Calculates pixels_per_cm = pixel_distance / entered_height_cm
+
+  4. Save Results
+
+  The calibration data gets saved to calibration.yaml with the calculated pixels_per_cm        
+  ratio.
+
+  Issues in Docker
+
+  Interactive calibration won't work in headless Docker containers because:
+  - No display available for OpenCV windows
+  - No keyboard input for user interaction
+
+  For Docker deployments, you'd need either:
+  1. Known scale height (Method A)
+  2. Pre-generated calibration file (like the emulated one)
+  3. X11 forwarding for GUI access
+
 ## 1. Project Structure Example
 
 ```
