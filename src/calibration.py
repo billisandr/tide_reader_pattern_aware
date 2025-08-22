@@ -12,7 +12,7 @@ class CalibrationManager:
     def __init__(self, config):
         self.config = config
         self.logger = logging.getLogger(__name__)
-        self.calibration_file = Path('/app/data/calibration/calibration.yaml')
+        self.calibration_file = Path(os.path.join(os.getcwd(), 'data', 'calibration', 'calibration.yaml'))
     
     def is_calibrated(self):
         """Check if system is calibrated."""
