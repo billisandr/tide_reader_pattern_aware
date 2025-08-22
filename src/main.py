@@ -11,6 +11,7 @@ from pathlib import Path
 from datetime import datetime
 import yaml
 import tkinter as tk
+from dotenv import load_dotenv
 
 from water_level_detector import WaterLevelDetector
 from calibration import CalibrationManager
