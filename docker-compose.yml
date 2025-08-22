@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  water-level-processor:
+    build: .
+    container_name: water-level-measurement
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./config.yaml:/app/config.yaml
+      - ${IMAGE_SOURCE_DIR}:/app/data/input:ro
+    environment:
+      - PROCESS_INTERVAL=${PROCESS_INTERVAL:-60}
+      - CALIBRATION_MODE=${CALIBRATION_MODE:-false}
+      - DB_PATH=${DB_PATH:-/app/data/measurements.db}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

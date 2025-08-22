@@ -1,0 +1,44 @@
+# Camera and Scale Configuration
+scale:
+  # Known height of scale in cm
+  total_height: 100.0
+  # Width of scale in cm (for reference)
+  width: 10.0
+  # Scale position in image (if fixed)
+  expected_position:
+    x_min: 300
+    x_max: 400
+    y_min: 50
+    y_max: 550
+
+calibration:
+  # Pixels per centimeter (will be calculated during calibration)
+  pixels_per_cm: null
+  # Reference water level for calibration (cm)
+  reference_water_level: 50.0
+
+detection:
+  # Water line detection parameters
+  edge_threshold_low: 50
+  edge_threshold_high: 150
+  blur_kernel_size: 7
+  min_contour_area: 500
+  
+  # Water detection method: 'edge', 'color', 'gradient'
+  method: 'edge'
+  
+  # Color-based detection (HSV ranges for water)
+  water_hsv_lower: [100, 50, 50]
+  water_hsv_upper: [130, 255, 255]
+
+processing:
+  # Image processing settings
+  resize_width: 800  # Resize images for faster processing
+  save_processed_images: true
+  image_format: 'jpg'
+  
+output:
+  # Output settings
+  csv_export: true
+  json_export: true
+  database: true

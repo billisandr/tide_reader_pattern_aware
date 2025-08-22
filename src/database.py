@@ -1,0 +1,113 @@
+"""
+Database management for storing water level measurements.
+"""
+
+import sqlite3
+from datetime import datetime
+import pandas as pd
+import logging
+from pathlib import Path
+
+class DatabaseManager:
+    def __init__(self, db_path):
+        self.db_path = db_path
+        self.logger = logging.getLogger(__name__)
+        self.init_database()
+    
+    def init_database(self):
+        """Initialize the database with required tables."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS measurements (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp DATETIME,
+                water_level_cm REAL,
+                scale_above_water_cm REAL,
+                image_path TEXT,
+                confidence REAL,
+                processed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS processed_images (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                image_path TEXT UNIQUE,
+                processed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        conn.commit()
+        conn.close()
+        
+        self.logger.info(f"Database initialized at {self.db_path}")
+    
+    def store_measurement(self, timestamp, water_level, scale_above_water, 
+                         image_path, confidence):
+        """Store a water level measurement."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            INSERT INTO measurements 
+            (timestamp, water_level_cm, scale_above_water_cm, image_path, confidence)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (timestamp, water_level, scale_above_water, image_path, confidence))
+        
+        # Mark image as processed
+        cursor.execute('''
+            INSERT OR IGNORE INTO processed_images (image_path)
+            VALUES (?)
+        ''', (image_path,))
+        
+        conn.commit()
+        conn.close()
+        
+        self.logger.debug(f"Stored measurement: {water_level:.1f}cm at {timestamp}")
+    
+    def is_image_processed(self, image_path):
+        """Check if an image has been processed."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT COUNT(*) FROM processed_images
+            WHERE image_path = ?
+        ''', (str(image_path),))
+        
+        count = cursor.fetchone()[0]
+        conn.close()
+        
+        return count > 0
+    
+    def get_measurements(self, start_date=None, end_date=None):
+        """Retrieve measurements within date range."""
+        conn = sqlite3.connect(self.db_path)
+        
+        query = "SELECT * FROM measurements"
+        params = []
+        
+        if start_date or end_date:
+            conditions = []
+            if start_date:
+                conditions.append("timestamp >= ?")
+                params.append(start_date)
+            if end_date:
+                conditions.append("timestamp <= ?")
+                params.append(end_date)
+            query += " WHERE " + " AND ".join(conditions)
+        
+        query += " ORDER BY timestamp"
+        
+        df = pd.read_sql_query(query, conn, params=params)
+        conn.close()
+        
+        return df
+    
+    def export_to_csv(self, output_path, start_date=None, end_date=None):
+        """Export measurements to CSV."""
+        df = self.get_measurements(start_date, end_date)
+        df.to_csv(output_path, index=False)
+        self.logger.info(f"Exported {len(df)} measurements to {output_path}")
