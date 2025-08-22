@@ -40,7 +40,7 @@ def main():
     load_dotenv()
     
     # Setup logging
-    setup_logging()
+    setup_logging(logging.DEBUG)  # Enable debug logging
     logger = logging.getLogger(__name__)
     
     # Ask user to specify the input photos directory
@@ -106,8 +106,10 @@ def main():
     
     while True:
         try:
+            logger.debug("Checking for unprocessed images...")
             # Get unprocessed images
             images = get_unprocessed_images(input_dir, processed_dir, db_manager)
+            logger.debug(f"get_unprocessed_images returned {len(images) if images else 0} images")
             
             if images:
                 logger.info(f"Found {len(images)} new images to process")

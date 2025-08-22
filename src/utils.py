@@ -32,8 +32,14 @@ def get_unprocessed_images(input_dir, processed_dir, db_manager):
     """
     Get list of images that haven't been processed yet.
     """
+    logger = logging.getLogger(__name__)
+    logger.debug(f"Getting unprocessed images from: {input_dir}")
+    
     input_path = Path(input_dir)
     processed_path = Path(processed_dir)
+    
+    logger.debug(f"Input path exists: {input_path.exists()}")
+    logger.debug(f"Processed path exists: {processed_path.exists()}")
     
     # Get all image files (use set to avoid duplicates on case-insensitive filesystems)
     image_extensions = ['*.jpg', '*.jpeg', '*.png', '*.JPG', '*.JPEG', '*.PNG']
@@ -43,16 +49,22 @@ def get_unprocessed_images(input_dir, processed_dir, db_manager):
         all_images_set.update(input_path.glob(ext))
     
     all_images = list(all_images_set)
+    logger.debug(f"Found {len(all_images)} total image files")
     
     # Sort by filename (assuming timestamp in filename)
     all_images.sort(key=lambda x: extract_timestamp(x.name) or x.stat().st_mtime)
     
     # Filter out processed images
     unprocessed = []
+    logger.debug("Checking database for processed images...")
     for img_path in all_images:
-        if not db_manager.is_image_processed(str(img_path)):
+        logger.debug(f"Checking if processed: {img_path}")
+        is_processed = db_manager.is_image_processed(str(img_path))
+        logger.debug(f"Database says processed: {is_processed}")
+        if not is_processed:
             unprocessed.append(img_path)
     
+    logger.debug(f"Returning {len(unprocessed)} unprocessed images")
     return unprocessed
 
 def extract_timestamp(filename):
