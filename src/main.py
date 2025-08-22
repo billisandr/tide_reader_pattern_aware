@@ -76,6 +76,8 @@ def main():
     
     # Initialize components
     db_path = os.environ.get('DB_PATH', os.path.join(os.getcwd(), 'data', 'measurements.db'))
+    logger.info(f"Database path: {db_path}")
+    logger.info(f"Database file exists: {os.path.exists(db_path)}")
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     db_manager = DatabaseManager(db_path)
     calibration_manager = CalibrationManager(config)
