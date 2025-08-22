@@ -2,6 +2,8 @@
 
 Automated water level detection and measurement system using computer vision, designed for Raspberry Pi captured images with fixed camera-scale setup.
 
+> Disclaimer: This work is part of a non-funded prototype research idea condacted  at the [SenseLAB](http://senselab.tuc.gr/) of the [TUC](https://www.tuc.gr/el/archi).
+
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 ## Features
