@@ -42,3 +42,20 @@ output:
   csv_export: true
   json_export: true
   database: true
+
+debug:
+  # Visual debugging options
+  enabled: false
+  save_debug_images: true
+  debug_output_dir: 'data/debug'
+  annotation_color: [0, 255, 0]  # Green BGR
+  annotation_thickness: 2
+  font_scale: 0.7
+  steps_to_save:
+    - 'original'
+    - 'preprocessed' 
+    - 'edges'
+    - 'contours'
+    - 'scale_detection'
+    - 'water_detection'
+    - 'final_result'

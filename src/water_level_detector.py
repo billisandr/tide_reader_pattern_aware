@@ -4,11 +4,14 @@ Water level detection module adapted from prateekralhan's approach.
 
 import cv2
 import numpy as np
+import os
 from scipy.spatial import distance as dist
 from imutils import perspective, contours
 import imutils
 from datetime import datetime
 import logging
+import time
+from debug_visualizer import DebugVisualizer
 
 class WaterLevelDetector:
     def __init__(self, config, pixels_per_cm):
@@ -25,6 +28,10 @@ class WaterLevelDetector:
         # Scale parameters
         self.scale_height_cm = config['scale']['total_height']
         self.scale_region = config['scale']['expected_position']
+        
+        # Initialize debug visualizer
+        debug_enabled = os.environ.get('DEBUG_MODE', 'false').lower() == 'true'
+        self.debug_viz = DebugVisualizer(config, enabled=debug_enabled)
     
     def detect_water_line(self, image):
         """
@@ -40,6 +47,23 @@ class WaterLevelDetector:
                 self.scale_region['y_min']:self.scale_region['y_max'],
                 self.scale_region['x_min']:self.scale_region['x_max']
             ]
+            
+            # Debug: Show scale region
+            scale_rect_annotations = {
+                'rectangles': [{
+                    'x': self.scale_region['x_min'],
+                    'y': self.scale_region['y_min'],
+                    'w': self.scale_region['x_max'] - self.scale_region['x_min'],
+                    'h': self.scale_region['y_max'] - self.scale_region['y_min'],
+                    'color': (255, 0, 0),  # Blue
+                    'label': 'Scale Region'
+                }]
+            }
+            self.debug_viz.save_debug_image(
+                image, 'scale_detection',
+                annotations=scale_rect_annotations,
+                info_text=f"Scale region: {self.scale_region}"
+            )
         else:
             roi = gray
         
@@ -49,25 +73,60 @@ class WaterLevelDetector:
         # Detect edges
         edges = cv2.Canny(blurred, self.edge_low, self.edge_high)
         
+        # Debug: Save edge detection result
+        self.debug_viz.save_debug_image(
+            edges, 'edges',
+            info_text=[
+                f"Canny edges: low={self.edge_low}, high={self.edge_high}",
+                f"Blur kernel: {self.blur_kernel}x{self.blur_kernel}"
+            ]
+        )
+        
         # Find horizontal lines (water surface tends to be horizontal)
         lines = cv2.HoughLinesP(edges, 1, np.pi/180, 100, 
                                 minLineLength=50, maxLineGap=10)
         
+        detected_lines = []
+        horizontal_lines = []
+        
         if lines is not None:
             # Find the most prominent horizontal line
-            horizontal_lines = []
             for line in lines:
                 x1, y1, x2, y2 = line[0]
                 angle = np.abs(np.arctan2(y2 - y1, x2 - x1) * 180 / np.pi)
+                
+                # Adjust coordinates if using ROI
+                if self.scale_region:
+                    x1 += self.scale_region['x_min']
+                    x2 += self.scale_region['x_min']
+                    y1 += self.scale_region['y_min']
+                    y2 += self.scale_region['y_min']
+                
+                detected_lines.append({
+                    'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2,
+                    'color': (0, 255, 255) if angle < 10 or angle > 170 else (0, 0, 255),  # Yellow for horizontal, red for others
+                    'thickness': 2,
+                    'label': f'{angle:.1f}°'
+                })
+                
                 if angle < 10 or angle > 170:  # Nearly horizontal
                     horizontal_lines.append((y1 + y2) / 2)
             
+            # Debug: Show detected lines
+            lines_annotations = {'lines': detected_lines}
+            self.debug_viz.save_debug_image(
+                image, 'contours',
+                annotations=lines_annotations,
+                info_text=[
+                    f"Total lines detected: {len(detected_lines)}",
+                    f"Horizontal lines: {len(horizontal_lines)}"
+                ]
+            )
+            
             if horizontal_lines:
                 # Return median y-coordinate of horizontal lines
-                water_line_y = np.median(horizontal_lines)
-                if self.scale_region:
-                    water_line_y += self.scale_region['y_min']
-                return int(water_line_y)
+                water_line_y = int(np.median(horizontal_lines))
+                return water_line_y
         
         # Fallback: detect using gradient changes
         return self.detect_water_line_gradient(gray)
@@ -174,12 +233,23 @@ class WaterLevelDetector:
         """
         Main processing function for a single image.
         """
+        start_time = time.time()
+        
         try:
+            # Initialize debug for this image
+            self.debug_viz.start_image_debug(image_path)
+            
             # Load image
             image = cv2.imread(image_path)
             if image is None:
                 self.logger.error(f"Failed to load image: {image_path}")
                 return None
+            
+            # Debug: Save original image
+            self.debug_viz.save_debug_image(
+                image, 'original',
+                info_text=f"Original image: {image.shape[1]}x{image.shape[0]}"
+            )
             
             # Resize if configured
             if self.config['processing']['resize_width']:
@@ -191,10 +261,25 @@ class WaterLevelDetector:
                 # Adjust pixels_per_cm for resized image
                 scale_factor = new_width / width
                 adjusted_pixels_per_cm = self.pixels_per_cm * scale_factor
+                
+                # Debug: Save resized image
+                self.debug_viz.save_debug_image(
+                    image, 'preprocessed',
+                    info_text=[
+                        f"Resized: {width}x{height} -> {new_width}x{new_height}",
+                        f"Scale factor: {scale_factor:.3f}",
+                        f"Adjusted pixels/cm: {adjusted_pixels_per_cm:.2f}"
+                    ]
+                )
             else:
                 adjusted_pixels_per_cm = self.pixels_per_cm
+                # Debug: Save original as preprocessed
+                self.debug_viz.save_debug_image(
+                    image, 'preprocessed',
+                    info_text=f"No resize applied, pixels/cm: {adjusted_pixels_per_cm:.2f}"
+                )
             
-            # Detect water line
+            # Detect water line with debug annotations
             water_line_y = self.detect_water_line(image)
             
             # Detect scale bounds
@@ -210,6 +295,61 @@ class WaterLevelDetector:
                 result['timestamp'] = datetime.now()
                 result['image_path'] = image_path
                 result['confidence'] = self.estimate_confidence(result)
+                result['processing_time'] = time.time() - start_time
+                
+                # Debug: Create final result visualization
+                final_annotations = {
+                    'lines': [
+                        {
+                            'x1': 0, 'y1': water_line_y, 
+                            'x2': image.shape[1], 'y2': water_line_y,
+                            'color': (0, 255, 0), 'thickness': 3,
+                            'label': f'Water Level: {result["water_level_cm"]:.1f}cm'
+                        }
+                    ],
+                    'points': [
+                        {
+                            'x': image.shape[1] - 50, 'y': scale_top_y,
+                            'color': (255, 0, 0), 'radius': 8,
+                            'label': 'Scale Top'
+                        },
+                        {
+                            'x': image.shape[1] - 50, 'y': scale_bottom_y,
+                            'color': (255, 0, 0), 'radius': 8,
+                            'label': 'Scale Bottom'
+                        }
+                    ],
+                    'text': [
+                        {
+                            'x': 20, 'y': 50,
+                            'text': f'Water Level: {result["water_level_cm"]:.1f} cm',
+                            'color': (0, 255, 0), 'scale': 1.0
+                        },
+                        {
+                            'x': 20, 'y': 80,
+                            'text': f'Scale Above Water: {result["scale_above_water_cm"]:.1f} cm',
+                            'color': (255, 255, 0), 'scale': 0.8
+                        },
+                        {
+                            'x': 20, 'y': 110,
+                            'text': f'Confidence: {result["confidence"]:.2f}',
+                            'color': (255, 255, 255), 'scale': 0.8
+                        }
+                    ]
+                }
+                
+                self.debug_viz.save_debug_image(
+                    image, 'final_result',
+                    annotations=final_annotations,
+                    info_text=[
+                        f"Processing completed in {result['processing_time']:.2f}s",
+                        f"Water level: {result['water_level_cm']:.1f}cm",
+                        f"Pixels per cm: {adjusted_pixels_per_cm:.2f}"
+                    ]
+                )
+                
+                # Create summary image
+                self.debug_viz.create_summary_image(result)
                 
                 # Save processed image if configured
                 if self.config['processing']['save_processed_images']:

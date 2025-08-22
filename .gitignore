@@ -43,6 +43,9 @@ data/
 *.db
 *.sqlite
 
+# Debug output (large image files)
+data/debug/
+
 # Docker
 .dockerignore
 
