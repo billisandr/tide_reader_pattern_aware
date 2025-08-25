@@ -108,7 +108,7 @@ Create a `.env` file with the following settings:
 USE_GUI_SELECTOR=false          # Enable GUI directory selection
 CALIBRATION_MODE=false          # Run in calibration mode
 PROCESS_INTERVAL=60            # Processing interval (seconds)
-DB_PATH=./data/measurements.db # Database file path
+DB_PATH=./data/output/measurements.db # Database file path
 
 # Web Server (Docker deployment)
 SECRET_KEY=your-secret-key-here
@@ -396,7 +396,7 @@ The project follows standard Python conventions:
 **No images being processed:**
 - Verify image directory permissions
 - Check database path configuration
-- Clear database if paths have changed: `rm data/measurements.db`
+- Clear database if paths have changed: `rm data/output/measurements.db`
 
 **GUI directory selector not appearing:**
 - Ensure `USE_GUI_SELECTOR=true` in environment
@@ -454,7 +454,7 @@ cp your-key.pem key.pem
 SECRET_KEY=production-secret-key
 ADMIN_USER=your-username  
 ADMIN_PASS=secure-password
-DB_PATH=/app/data/measurements.db
+DB_PATH=/app/data/output/measurements.db
 ```
 
 3. **Deploy with Docker Compose:**

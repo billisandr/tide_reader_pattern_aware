@@ -13,7 +13,7 @@ services:
     environment:
       - PROCESS_INTERVAL=${PROCESS_INTERVAL:-60}
       - CALIBRATION_MODE=${CALIBRATION_MODE:-false}
-      - DB_PATH=${DB_PATH:-/app/data/measurements.db}
+      - DB_PATH=${DB_PATH:-/app/data/output/measurements.db}
     restart: unless-stopped
     logging:
       driver: "json-file"
