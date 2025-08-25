@@ -1,15 +1,15 @@
 # Camera and Scale Configuration
 scale:
   # Known height of scale in cm
-  total_height: 100.0
+  total_height: 450.0
   # Width of scale in cm (for reference)
-  width: 10.0
+  width: 8.0
   # Scale position in image (if fixed)
   expected_position:
-    x_min: 300
-    x_max: 400
-    y_min: 50
-    y_max: 550
+    x_min: 81
+    x_max: 181
+    y_min: 1
+    y_max: 603
   
   # RGB/HSV color-based scale detection
   color_detection:
@@ -27,20 +27,20 @@ scale:
       
       white:
         enabled: true
-        hsv_lower: [0, 0, 200]
-        hsv_upper: [180, 30, 255]
+        hsv_lower: [1, 0, 0]
+        hsv_upper: [164, 108, 255]
         description: "White scale background"
       
       blue:
         enabled: true
-        hsv_lower: [100, 100, 50]
-        hsv_upper: [120, 255, 255]
-        description: "Blue scale markings"
-      
+        hsv_lower: [94, 12, 155]
+        hsv_upper: [114, 112, 255]
+        description: "Blue scale background"
+
       black:
         enabled: true
-        hsv_lower: [0, 0, 0]
-        hsv_upper: [180, 255, 50]
+        hsv_lower: [97, 0, 0]
+        hsv_upper: [129, 92, 87]
         description: "Black scale markings"
       
       red:

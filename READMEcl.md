@@ -171,23 +171,52 @@ processing:
 
 ## Usage
 
+### Scale Configuration Analysis
+
+**Before calibration**, use the scale analysis tool to determine optimal configuration values:
+
+```bash
+# 1. Place your scale image as data/calibration/calibration_image.jpg
+# 2. Run the scale analysis tool
+python src/calibration/analyze_scale_photo.py
+```
+
+**The analysis tool provides:**
+- **Interactive coordinate picker**: Click on scale corners to define boundaries
+- **Interactive color selection**: Click on scale background and marking colors
+- **Automatic edge detection**: Finds potential scale edges using computer vision
+- **Color analysis**: Analyzes selected scale colors for RGB/HSV detection setup
+- **Configuration suggestions**: Generates optimal config.yaml values with custom color ranges
+
+**Analysis workflow:**
+1. **Basic image analysis**: Shows dimensions and file info
+2. **Interactive boundary selection**: Click 4 corner points (top-left, top-right, bottom-left, bottom-right of scale)
+3. **Interactive color sampling**: Click on scale background color, then on marking/text color
+4. **Edge detection**: Automatically finds vertical/horizontal lines
+5. **Color analysis**: Processes selected colors and generates precise HSV ranges
+6. **Config generation**: Provides ready-to-use config.yaml values with your specific colors
+
 ### Calibration Process
 
 **Automatic calibration** (recommended for known scale heights):
 ```bash
-# 1. Place calibration image in data/calibration/
-# 2. Set scale height in config.yaml
-# 3. Run calibration
+# 1. Place calibration image in data/calibration/ as calibration_image.jpg
+# 2. Run scale analysis first: python src/calibration/analyze_scale_photo.py
+# 3. Update config.yaml with suggested values
+# 4. Set scale height in config.yaml
+# 5. Run calibration
 CALIBRATION_MODE=true python src/main.py
 ```
 
 **Interactive calibration** (for manual setup):
 ```bash
-# 1. Place calibration image in data/calibration/  
-# 2. Run interactive mode
+# 1. Place calibration image in data/calibration/ as calibration_image.jpg
+# 2. Run scale analysis: python src/calibration/analyze_scale_photo.py
+# 3. Update config.yaml with analysis results
+# 4. Run interactive mode
 CALIBRATION_MODE=true python src/main.py
-# 3. Click top and bottom of scale when prompted
-# 4. Enter actual height in centimeters
+# 5. Click top and bottom of scale when prompted
+# 6. Enter actual height in centimeters
 ```
 
 ### Processing Images
@@ -366,14 +395,20 @@ mkdir -p data/{input,processed,calibration,output} logs
 ### Running Tests
 
 ```bash
-# Run with debug logging
+# 1. Scale configuration analysis
+python src/calibration/analyze_scale_photo.py
+
+# 2. Run with debug logging
 python src/main.py
 
-# Test GUI interface
+# 3. Test GUI interface
 USE_GUI_SELECTOR=true python src/main.py
 
-# Test calibration
+# 4. Test calibration
 CALIBRATION_MODE=true python src/main.py
+
+# 5. Test color detection with debug
+DEBUG_MODE=true python src/main.py
 ```
 
 ### Code Style
