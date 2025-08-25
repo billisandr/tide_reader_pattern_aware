@@ -29,17 +29,31 @@ class WaterLevelDetector:
         self.scale_height_cm = config['scale']['total_height']
         self.scale_region = config['scale']['expected_position']
         
+        # RGB color detection parameters
+        self.color_detection_enabled = config['scale']['color_detection']['enabled']
+        self.scale_colors = config['scale']['color_detection']['scale_colors']
+        self.morphology_config = config['scale']['color_detection']['morphology']
+        self.debug_color_masks = config['scale']['color_detection']['debug_color_masks']
+        
         # Initialize debug visualizer
         debug_enabled = os.environ.get('DEBUG_MODE', 'false').lower() == 'true'
         self.debug_viz = DebugVisualizer(config, enabled=debug_enabled)
     
     def detect_water_line(self, image):
         """
-        Detect the water line in the image.
+        Detect the water line in the image using enhanced color-based edge detection.
         Returns y-coordinate of water line.
         """
         # Convert to grayscale
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        
+        # Apply color enhancement if enabled
+        enhanced_edges = None
+        if self.color_detection_enabled:
+            color_mask, color_masks = self.enhance_scale_detection_rgb(image)
+            if color_mask is not None:
+                # Create color-enhanced edges by combining multiple approaches
+                enhanced_edges = self.create_color_enhanced_edges(image, color_mask, color_masks)
         
         # Focus on scale region if defined
         if self.scale_region:
@@ -47,6 +61,15 @@ class WaterLevelDetector:
                 self.scale_region['y_min']:self.scale_region['y_max'],
                 self.scale_region['x_min']:self.scale_region['x_max']
             ]
+            
+            # Also apply to enhanced edges if available
+            if enhanced_edges is not None:
+                enhanced_roi = enhanced_edges[
+                    self.scale_region['y_min']:self.scale_region['y_max'],
+                    self.scale_region['x_min']:self.scale_region['x_max']
+                ]
+            else:
+                enhanced_roi = None
             
             # Debug: Show scale region
             scale_rect_annotations = {
@@ -66,12 +89,20 @@ class WaterLevelDetector:
             )
         else:
             roi = gray
+            enhanced_roi = enhanced_edges
         
         # Apply Gaussian blur
         blurred = cv2.GaussianBlur(roi, (self.blur_kernel, self.blur_kernel), 0)
         
-        # Detect edges
-        edges = cv2.Canny(blurred, self.edge_low, self.edge_high)
+        # Detect edges - use enhanced edges if available, otherwise standard Canny
+        if enhanced_roi is not None:
+            edges = enhanced_roi
+            self.debug_viz.save_debug_image(
+                edges, 'edges_color_enhanced',
+                info_text="Color-enhanced edge detection"
+            )
+        else:
+            edges = cv2.Canny(blurred, self.edge_low, self.edge_high)
         
         # Debug: Save edge detection result
         self.debug_viz.save_debug_image(
@@ -158,14 +189,187 @@ class WaterLevelDetector:
         
         return None
     
-    def detect_scale_bounds(self, image):
+    def enhance_scale_detection_rgb(self, image):
         """
-        Detect the top and bottom of the scale.
+        Enhance scale detection using RGB/HSV color filtering.
+        Returns combined mask highlighting potential scale regions.
+        """
+        if not self.color_detection_enabled:
+            return None
+        
+        # Convert to HSV for better color separation
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        
+        # Initialize combined mask
+        combined_mask = np.zeros(hsv.shape[:2], dtype=np.uint8)
+        color_masks = {}
+        
+        # Apply each enabled color filter
+        for color_name, color_config in self.scale_colors.items():
+            if not color_config.get('enabled', True):
+                continue
+            
+            # Create color mask
+            lower = np.array(color_config['hsv_lower'])
+            upper = np.array(color_config['hsv_upper'])
+            mask = cv2.inRange(hsv, lower, upper)
+            
+            # Apply morphological operations to clean up mask
+            kernel_size = self.morphology_config['kernel_size']
+            kernel = np.ones((kernel_size, kernel_size), np.uint8)
+            
+            # Close gaps and remove noise
+            mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, 
+                                  iterations=self.morphology_config['close_iterations'])
+            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel,
+                                  iterations=self.morphology_config['open_iterations'])
+            
+            # Store individual mask for debugging
+            color_masks[color_name] = mask
+            
+            # Add to combined mask
+            combined_mask = cv2.bitwise_or(combined_mask, mask)
+        
+        # Debug: Save individual and combined color masks
+        if self.debug_color_masks:
+            self.debug_viz.save_debug_image(
+                hsv, 'hsv_conversion',
+                info_text="HSV color space conversion"
+            )
+            
+            # Save individual color masks
+            for color_name, mask in color_masks.items():
+                mask_colored = cv2.applyColorMap(mask, cv2.COLORMAP_JET)
+                self.debug_viz.save_debug_image(
+                    mask_colored, f'color_mask_{color_name}',
+                    info_text=[
+                        f"{color_name.capitalize()} mask",
+                        f"HSV range: {self.scale_colors[color_name]['hsv_lower']} - {self.scale_colors[color_name]['hsv_upper']}",
+                        f"Pixels detected: {np.sum(mask > 0)}"
+                    ]
+                )
+            
+            # Save combined mask
+            combined_colored = cv2.applyColorMap(combined_mask, cv2.COLORMAP_JET)
+            self.debug_viz.save_debug_image(
+                combined_colored, 'color_mask_combined',
+                info_text=[
+                    "Combined color mask",
+                    f"Total pixels detected: {np.sum(combined_mask > 0)}",
+                    f"Colors used: {', '.join([name for name, config in self.scale_colors.items() if config.get('enabled', True)])}"
+                ]
+            )
+        
+        return combined_mask, color_masks
+    
+    def create_color_enhanced_edges(self, image, color_mask, color_masks):
+        """
+        Create enhanced edge map using color information and multiple edge detection approaches.
         """
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         
-        # Use edge detection to find scale
-        edges = cv2.Canny(gray, self.edge_low, self.edge_high)
+        # Method 1: Standard Canny on color-masked grayscale
+        masked_gray = cv2.bitwise_and(gray, gray, mask=color_mask)
+        blurred = cv2.GaussianBlur(masked_gray, (self.blur_kernel, self.blur_kernel), 0)
+        edges_masked = cv2.Canny(blurred, self.edge_low, self.edge_high)
+        
+        # Method 2: Multi-channel edge detection
+        b, g, r = cv2.split(image)
+        edges_combined = np.zeros_like(gray)
+        
+        for channel in [b, g, r]:
+            # Apply color mask to each channel
+            masked_channel = cv2.bitwise_and(channel, channel, mask=color_mask)
+            blurred_channel = cv2.GaussianBlur(masked_channel, (self.blur_kernel, self.blur_kernel), 0)
+            channel_edges = cv2.Canny(blurred_channel, self.edge_low, self.edge_high)
+            edges_combined = cv2.bitwise_or(edges_combined, channel_edges)
+        
+        # Method 3: Color transition edges (detect boundaries between different colors)
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        h, s, v = cv2.split(hsv)
+        
+        # Detect edges in hue channel (color transitions)
+        hue_edges = cv2.Canny(h, 30, 100)
+        # Apply color mask to focus on scale region
+        hue_edges = cv2.bitwise_and(hue_edges, hue_edges, mask=color_mask)
+        
+        # Method 4: Individual color mask edges
+        individual_edges = np.zeros_like(gray)
+        for color_name, mask in color_masks.items():
+            if color_name in ['yellow', 'white']:  # Background colors
+                continue  # Skip background, focus on markings
+            
+            # Detect edges within this color region
+            color_roi = cv2.bitwise_and(gray, gray, mask=mask)
+            if np.sum(mask > 0) > 100:  # Only if sufficient pixels
+                color_edges = cv2.Canny(color_roi, self.edge_low // 2, self.edge_high // 2)
+                individual_edges = cv2.bitwise_or(individual_edges, color_edges)
+        
+        # Combine all edge detection methods
+        final_edges = cv2.bitwise_or(edges_masked, edges_combined)
+        final_edges = cv2.bitwise_or(final_edges, hue_edges)
+        final_edges = cv2.bitwise_or(final_edges, individual_edges)
+        
+        # Clean up the combined edges
+        kernel = np.ones((2, 2), np.uint8)
+        final_edges = cv2.morphologyEx(final_edges, cv2.MORPH_CLOSE, kernel, iterations=1)
+        
+        # Debug: Save intermediate edge results
+        self.debug_viz.save_debug_image(
+            edges_masked, 'edges_masked_gray',
+            info_text="Canny edges on color-masked grayscale"
+        )
+        
+        self.debug_viz.save_debug_image(
+            edges_combined, 'edges_multi_channel',
+            info_text="Combined edges from RGB channels"
+        )
+        
+        self.debug_viz.save_debug_image(
+            hue_edges, 'edges_hue_transitions',
+            info_text="Hue channel color transition edges"
+        )
+        
+        self.debug_viz.save_debug_image(
+            individual_edges, 'edges_individual_colors',
+            info_text="Edges from individual color masks"
+        )
+        
+        self.debug_viz.save_debug_image(
+            final_edges, 'edges_final_combined',
+            info_text="Final combined color-enhanced edges"
+        )
+        
+        return final_edges
+    
+    def detect_scale_bounds(self, image):
+        """
+        Detect the top and bottom of the scale using RGB filtering and edge detection.
+        """
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        
+        # Apply RGB color filtering if enabled
+        if self.color_detection_enabled:
+            color_mask, color_masks = self.enhance_scale_detection_rgb(image)
+            
+            if color_mask is not None:
+                # Use color mask to focus edge detection on scale regions
+                masked_gray = cv2.bitwise_and(gray, gray, mask=color_mask)
+                
+                # Debug: Show masked grayscale
+                self.debug_viz.save_debug_image(
+                    masked_gray, 'masked_grayscale',
+                    info_text="Grayscale with color mask applied"
+                )
+                
+                # Apply edge detection to masked image
+                edges = cv2.Canny(masked_gray, self.edge_low, self.edge_high)
+            else:
+                # Fallback to standard edge detection
+                edges = cv2.Canny(gray, self.edge_low, self.edge_high)
+        else:
+            # Standard edge detection without color filtering
+            edges = cv2.Canny(gray, self.edge_low, self.edge_high)
         
         # Find contours
         cnts = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -174,9 +378,10 @@ class WaterLevelDetector:
         if not cnts:
             return None, None
         
-        # Find the largest vertical contour (likely the scale)
+        # Find the best scale contour considering both size and color information
         scale_contour = None
-        max_height = 0
+        max_score = 0
+        detected_contours = []
         
         for c in cnts:
             if cv2.contourArea(c) < self.config['detection']['min_contour_area']:
@@ -185,14 +390,75 @@ class WaterLevelDetector:
             # Get bounding box
             x, y, w, h = cv2.boundingRect(c)
             
-            # Check if in expected region and is vertical
+            # Check if in expected region
+            in_expected_region = True
             if self.scale_region:
-                if not (self.scale_region['x_min'] <= x <= self.scale_region['x_max']):
-                    continue
+                if not (self.scale_region['x_min'] <= x <= self.scale_region['x_max'] and
+                       self.scale_region['y_min'] <= y <= self.scale_region['y_max']):
+                    in_expected_region = False
             
-            if h > w * 2 and h > max_height:  # Vertical object
-                max_height = h
+            # Calculate score based on multiple factors
+            aspect_ratio_score = 1.0 if h > w * 2 else (h / w) / 2  # Prefer vertical objects
+            size_score = min(h / 200.0, 1.0)  # Prefer larger objects, cap at 200px
+            region_score = 1.0 if in_expected_region else 0.3  # Strong preference for expected region
+            
+            # If color detection is enabled, boost score for contours in color regions
+            color_score = 1.0
+            if self.color_detection_enabled and color_mask is not None:
+                # Check overlap with color mask
+                contour_mask = np.zeros_like(color_mask)
+                cv2.drawContours(contour_mask, [c], -1, 255, -1)
+                overlap = cv2.bitwise_and(color_mask, contour_mask)
+                overlap_ratio = np.sum(overlap > 0) / cv2.contourArea(c)
+                color_score = 0.5 + 1.5 * overlap_ratio  # Boost score for color overlap
+            
+            total_score = aspect_ratio_score * size_score * region_score * color_score
+            
+            # Store for debugging
+            detected_contours.append({
+                'contour': c,
+                'bbox': (x, y, w, h),
+                'scores': {
+                    'aspect_ratio': aspect_ratio_score,
+                    'size': size_score, 
+                    'region': region_score,
+                    'color': color_score,
+                    'total': total_score
+                }
+            })
+            
+            if total_score > max_score:
+                max_score = total_score
                 scale_contour = c
+        
+        # Debug: Show all detected contours with scores
+        if detected_contours:
+            contour_annotations = {
+                'rectangles': [],
+                'text': []
+            }
+            
+            for i, cont_info in enumerate(detected_contours[:10]):  # Limit to top 10
+                x, y, w, h = cont_info['bbox']
+                score = cont_info['scores']['total']
+                is_best = (cont_info['contour'] is scale_contour)
+                
+                contour_annotations['rectangles'].append({
+                    'x': x, 'y': y, 'w': w, 'h': h,
+                    'color': (0, 255, 0) if is_best else (0, 0, 255),
+                    'thickness': 3 if is_best else 1,
+                    'label': f'Score: {score:.2f}' + (' [BEST]' if is_best else '')
+                })
+        
+            self.debug_viz.save_debug_image(
+                image, 'scale_contours_analysis',
+                annotations=contour_annotations,
+                info_text=[
+                    f"Contours analyzed: {len(detected_contours)}",
+                    f"Best score: {max_score:.2f}",
+                    "Green = selected scale, Red = other contours"
+                ]
+            )
         
         if scale_contour is not None:
             x, y, w, h = cv2.boundingRect(scale_contour)

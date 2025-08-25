@@ -10,6 +10,62 @@ scale:
     x_max: 400
     y_min: 50
     y_max: 550
+  
+  # RGB/HSV color-based scale detection
+  color_detection:
+    enabled: true
+    adaptive_thresholding: true
+    debug_color_masks: true
+    
+    # Scale color definitions (HSV ranges)
+    scale_colors:
+      yellow:
+        enabled: true
+        hsv_lower: [20, 100, 100]
+        hsv_upper: [30, 255, 255]
+        description: "Yellow scale background"
+      
+      white:
+        enabled: true
+        hsv_lower: [0, 0, 200]
+        hsv_upper: [180, 30, 255]
+        description: "White scale background"
+      
+      blue:
+        enabled: true
+        hsv_lower: [100, 100, 50]
+        hsv_upper: [120, 255, 255]
+        description: "Blue scale markings"
+      
+      black:
+        enabled: true
+        hsv_lower: [0, 0, 0]
+        hsv_upper: [180, 255, 50]
+        description: "Black scale markings"
+      
+      red:
+        enabled: true
+        hsv_lower: [0, 100, 100]
+        hsv_upper: [10, 255, 255]
+        description: "Red scale background"
+      
+      red_alt:
+        enabled: true
+        hsv_lower: [170, 100, 100]
+        hsv_upper: [180, 255, 255]
+        description: "Red scale background (alt range)"
+      
+      white_markings:
+        enabled: true
+        hsv_lower: [0, 0, 220]
+        hsv_upper: [180, 20, 255]
+        description: "White scale markings on colored backgrounds"
+    
+    # Morphological operations for mask cleanup
+    morphology:
+      kernel_size: 3
+      close_iterations: 1
+      open_iterations: 1
 
 calibration:
   # Pixels per centimeter (will be calculated during calibration)

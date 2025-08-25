@@ -19,6 +19,7 @@ This system provides automated water/tide level detection and measurement using 
 
 - **Automated Processing**: Continuous monitoring of input directories
 - **Precise Calibration**: One-time setup for fixed camera-scale configurations  
+- **Advanced Scale Detection**: RGB/HSV color filtering for various scale types and markings
 - **Multiple Detection Methods**: Edge detection, color-based analysis, and gradient methods
 - **Database Storage**: SQLite database with comprehensive measurement history
 - **Docker Ready**: Fully containerized deployment with HTTPS server
@@ -122,6 +123,39 @@ ADMIN_PASS=secure-password
 scale:
   total_height: 100.0    # Known height in cm
   width: 10.0           # Scale width in cm
+  
+  # RGB/HSV color-based scale detection
+  color_detection:
+    enabled: true
+    adaptive_thresholding: true
+    debug_color_masks: true
+    
+    # Scale color definitions (HSV ranges)
+    scale_colors:
+      yellow:             # Yellow scale background
+        enabled: true
+        hsv_lower: [20, 100, 100]
+        hsv_upper: [30, 255, 255]
+      white:              # White scale background
+        enabled: true
+        hsv_lower: [0, 0, 200]
+        hsv_upper: [180, 30, 255]
+      red:                # Red scale background
+        enabled: true
+        hsv_lower: [0, 100, 100]
+        hsv_upper: [10, 255, 255]
+      blue:               # Blue scale markings
+        enabled: true
+        hsv_lower: [100, 100, 50]
+        hsv_upper: [120, 255, 255]
+      black:              # Black scale markings
+        enabled: true
+        hsv_lower: [0, 0, 0]
+        hsv_upper: [180, 255, 50]
+      white_markings:     # White markings on colored backgrounds
+        enabled: true
+        hsv_lower: [0, 0, 220]
+        hsv_upper: [180, 20, 255]
 
 # Detection parameters  
 detection:
@@ -199,17 +233,28 @@ DEBUG_MODE=true
 ```
 data/debug/
 └── debug_session_20250822_160530/
-    ├── original/          # Input images
-    ├── preprocessed/      # Resized images with metadata
-    ├── scale_detection/   # Scale region highlighting
-    ├── edges/            # Edge detection results
-    ├── contours/         # Detected lines and features
-    ├── final_result/     # Final measurements with annotations
-    └── summary images    # Processing summary
+    ├── original/                # Input images
+    ├── preprocessed/            # Resized images with metadata
+    ├── hsv_conversion/          # HSV color space conversion
+    ├── color_mask_yellow/       # Individual color masks
+    ├── color_mask_white/
+    ├── color_mask_red/
+    ├── color_mask_blue/
+    ├── color_mask_combined/     # Combined color masks
+    ├── edges_color_enhanced/    # Color-enhanced edge detection
+    ├── scale_contours_analysis/ # Scale detection analysis
+    ├── scale_detection/         # Scale region highlighting
+    ├── edges/                   # Standard edge detection results
+    ├── contours/                # Detected lines and features
+    ├── final_result/            # Final measurements with annotations
+    └── summary images           # Processing summary
 ```
 
 **Debug annotations include:**
+- **Color masks** for different scale types (yellow, white, red backgrounds; blue, black, white markings)
 - **Scale regions** highlighted with blue rectangles
+- **Contour analysis** showing scoring for scale detection candidates
+- **Enhanced edge detection** combining multiple color-based methods
 - **Detected lines** color-coded (yellow=horizontal water lines, red=other)
 - **Water level measurements** overlaid in green
 - **Processing parameters** and timing information
@@ -222,10 +267,46 @@ debug:
   debug_output_dir: 'data/debug'
   steps_to_save:
     - 'original'
-    - 'preprocessed' 
+    - 'preprocessed'
+    - 'hsv_conversion'
+    - 'color_mask_combined'
+    - 'edges_color_enhanced'
+    - 'scale_contours_analysis' 
     - 'edges'
     - 'final_result'
 ```
+
+### Scale Detection and Color Options
+
+The system uses advanced RGB/HSV color filtering to detect various types of measurement scales:
+
+**Supported Scale Types:**
+- **Yellow scales with blue markings** (common tide gauges)
+- **White scales with black markings** (laboratory equipment)
+- **Red scales with white markings** (industrial applications)
+- **Custom color combinations** via configuration
+
+**Color Detection Features:**
+- **Multi-channel edge detection** combining RGB and HSV analysis
+- **Adaptive thresholding** for varying lighting conditions  
+- **Morphological operations** for noise reduction and gap filling
+- **Contour scoring** based on size, aspect ratio, location, and color overlap
+- **Fallback methods** when color detection fails
+
+**Color Configuration:**
+Each color is defined by HSV ranges for robust detection across lighting conditions:
+```yaml
+scale_colors:
+  yellow:             # HSV: [20-30, 100-255, 100-255]
+  white:              # HSV: [0-180, 0-30, 200-255]  
+  red:                # HSV: [0-10, 100-255, 100-255]
+  red_alt:            # HSV: [170-180, 100-255, 100-255] (red wraparound)
+  blue:               # HSV: [100-120, 100-255, 50-255]
+  black:              # HSV: [0-180, 0-255, 0-50]
+  white_markings:     # HSV: [0-180, 0-20, 220-255] (high brightness, low saturation)
+```
+
+The color detection can be **enabled/disabled per color** and includes **extensive debug visualization** showing mask generation, edge enhancement, and contour analysis.
 
 ## Project Structure
 
