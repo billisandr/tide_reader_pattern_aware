@@ -6,6 +6,7 @@ import sqlite3
 from datetime import datetime
 import pandas as pd
 import logging
+import json
 from pathlib import Path
 
 class DatabaseManager:
@@ -117,5 +118,55 @@ class DatabaseManager:
     def export_to_csv(self, output_path, start_date=None, end_date=None):
         """Export measurements to CSV."""
         df = self.get_measurements(start_date, end_date)
+        # Ensure output directory exists
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         df.to_csv(output_path, index=False)
         self.logger.info(f"Exported {len(df)} measurements to {output_path}")
+    
+    def export_to_json(self, output_path, start_date=None, end_date=None):
+        """Export measurements to JSON."""
+        df = self.get_measurements(start_date, end_date)
+        # Ensure output directory exists
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        
+        # Convert DataFrame to JSON with proper datetime handling
+        measurements = []
+        for _, row in df.iterrows():
+            measurement = {
+                'id': int(row['id']),
+                'timestamp': row['timestamp'],
+                'water_level_cm': float(row['water_level_cm']) if pd.notna(row['water_level_cm']) else None,
+                'scale_above_water_cm': float(row['scale_above_water_cm']) if pd.notna(row['scale_above_water_cm']) else None,
+                'image_path': row['image_path'],
+                'confidence': float(row['confidence']) if pd.notna(row['confidence']) else None,
+                'processed_at': row['processed_at']
+            }
+            measurements.append(measurement)
+        
+        with open(output_path, 'w') as f:
+            json.dump(measurements, f, indent=2, default=str)
+        
+        self.logger.info(f"Exported {len(measurements)} measurements to {output_path}")
+    
+    def export_all_formats(self, output_dir, config, start_date=None, end_date=None):
+        """Export measurements in all enabled formats based on config."""
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Check config for enabled formats
+        if config.get('output', {}).get('csv_export', False):
+            csv_path = output_path / f"measurements_{timestamp}.csv"
+            self.export_to_csv(csv_path, start_date, end_date)
+        
+        if config.get('output', {}).get('json_export', False):
+            json_path = output_path / f"measurements_{timestamp}.json"
+            self.export_to_json(json_path, start_date, end_date)
+        
+        # Database export (copy database file)
+        if config.get('output', {}).get('database', False):
+            db_backup_path = output_path / f"measurements_{timestamp}.db"
+            import shutil
+            shutil.copy2(self.db_path, db_backup_path)
+            self.logger.info(f"Database backup created at {db_backup_path}")

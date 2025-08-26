@@ -206,11 +206,11 @@ detection:
   min_contour_area: 500
   
   # Water detection method: 'edge', 'color', 'gradient'
-  method: 'edge'
+  method: 'edge'              # Choose detection method (see Water Detection Methods section)
   
-  # Color-based detection (HSV ranges for water)
-  water_hsv_lower: [100, 50, 50]
-  water_hsv_upper: [130, 255, 255]
+  # Color-based detection (HSV ranges for water) - used when method: 'color'
+  water_hsv_lower: [100, 50, 50]   # Lower HSV bounds for water color detection
+  water_hsv_upper: [130, 255, 255] # Upper HSV bounds for water color detection
 
 processing:
   # Image processing settings
@@ -219,14 +219,14 @@ processing:
   image_format: 'jpg'
   
 output:
-  # Output settings
-  csv_export: true
-  json_export: true
-  database: true
+  # Output settings - Enable/disable export formats
+  csv_export: true      # Export measurements to timestamped CSV files
+  json_export: true     # Export measurements to timestamped JSON files  
+  database: true        # Create timestamped database backup copies
 
 debug:
-  # Visual debugging options
-  enabled: false
+  # Visual debugging options - can be overridden by DEBUG_MODE environment variable
+  enabled: false            # Set to true to enable debug mode via config
   save_debug_images: true
   debug_output_dir: 'data/debug'
   annotation_color: [0, 255, 0]  # Green BGR
@@ -258,8 +258,9 @@ python src/calibration/analyze_scale_photo.py
 
 - **Interactive coordinate picker**: Click on scale corners to define boundaries
 - **Interactive color selection**: Click on scale background and marking colors
+- **Interactive water color sampling**: Click on water color for detection parameter calibration
 - **Automatic edge detection**: Finds potential scale edges using computer vision
-- **Color analysis**: Analyzes selected scale colors for RGB/HSV detection setup
+- **Color analysis**: Analyzes selected scale and water colors for RGB/HSV detection setup
 - **Configuration suggestions**: Generates optimal config.yaml values with custom color ranges
 
 **Analysis workflow:**
@@ -267,61 +268,117 @@ python src/calibration/analyze_scale_photo.py
 1. **Basic image analysis**: Shows dimensions and file info
 2. **Interactive boundary selection**: Click 4 corner points (top-left, top-right, bottom-left, bottom-right of scale)
 3. **Interactive color sampling**: Click on scale background color, then on marking/text color
-4. **Edge detection**: Automatically finds vertical/horizontal lines
-5. **Color analysis**: Processes selected colors and generates precise HSV ranges
-6. **Config generation**: Provides ready-to-use config.yaml values with your specific colors
+4. **Interactive water sampling**: Click on water color (if visible) for detection calibration
+5. **Edge detection**: Automatically finds vertical/horizontal lines
+6. **Color analysis**: Processes selected colors and generates precise HSV ranges
+7. **Config generation**: Provides ready-to-use config.yaml values with scale and water colors
 
-### Calibration Process
+### Calibration System
 
-The `CalibrationManager` provides two calibration methods. **Important**: The `analyze_scale_photo.py` script is a separate analysis tool and is NOT automatically called during calibration.
+The system provides two integrated calibration workflows that work together to provide accurate water level measurements.
 
-#### Method 1: Automatic Calibration (Known Scale Height)
+#### Workflow 1: Interactive Analysis + Calibration (Recommended)
 
-**When used**: If `config['scale']['total_height']` is set in config.yaml  
-**How it works**:
+**Best for**: New setups, precise measurements, custom configurations
 
-- Uses `detect_scale_height_pixels()` to find the scale using edge detection  
-- Automatically detects the tallest vertical object (assumed to be the scale)
-- Calculates `pixels_per_cm = detected_pixels / known_height_cm`
-
-**Setup steps**:
-
+**Complete Process**:
 ```bash
-# 1. Place calibration image in data/calibration/ as calibration_image.jpg
-# 2. (Optional) Run scale analysis first: python src/calibration/analyze_scale_photo.py
-# 3. Set scale height in config.yaml (e.g., total_height: 450.0)
-# 4. Run calibration
+# Step 1: Interactive scale analysis (generates both config.yaml suggestions AND calibration data)
+python src/calibration/analyze_scale_photo.py
+# → Select 4 scale corners interactively 
+# → Choose scale background/marking colors
+# → Sample water color (optional)
+# → Generates config.yaml suggestions
+# → Optionally generates calibration.yaml with precise pixels_per_cm
+
+# Step 2: Apply the analysis results
+# - Update your config.yaml with suggested values
+# - Use generated calibration.yaml data
+
+# Step 3: Run calibration (uses generated data)
 set CALIBRATION_MODE=true && python src/main.py
+# → Loads calibration.yaml (if generated in Step 1)
+# → OR calculates from config.yaml settings
+# → Ready for water level detection
 ```
 
-#### Method 2: Interactive Calibration (Manual Setup)
+**Advantages**:
+- **Most accurate**: Interactive corner selection provides precise measurements
+- **Complete setup**: Handles both configuration AND calibration in one workflow  
+- **Color calibration**: Includes water color detection setup
+- **User control**: Full control over scale boundary definition
 
-**When used**: If `config['scale']['total_height']` is NOT set or is null  
-**How it works**:
+#### Workflow 2: Direct Configuration Calibration (Legacy)
 
-- Opens OpenCV window showing the calibration image
-- User clicks on two points: top and bottom of the scale
-- System prompts: `"Enter the actual height in cm:"`
-- User types the real-world distance between clicked points
-- Calculates `pixels_per_cm = pixel_distance / entered_height_cm`
+**Best for**: Quick setup, when you already have precise config.yaml settings
 
-**Setup steps**:
-
+**Process**:
 ```bash
-# 1. Place calibration image in data/calibration/ as calibration_image.jpg
-# 2. (Optional) Run scale analysis: python src/calibration/analyze_scale_photo.py
-# 3. Ensure config.yaml has total_height: null or not set
-# 4. Run interactive mode
+# Step 1: Ensure config.yaml has accurate scale settings
+# scale:
+#   total_height: 450.0        # Actual scale height in cm
+#   expected_position:         # Approximate scale location
+#     x_min: 75
+#     x_max: 190
+#     y_min: 1
+#     y_max: 605
+
+# Step 2: Place calibration image
+# - Save image as: data/calibration/calibration_image.jpg
+
+# Step 3: Run direct calibration
 set CALIBRATION_MODE=true && python src/main.py
-# 5. Click top and bottom of scale when prompted
-# 6. Enter actual height in centimeters
+# → Uses config.yaml values to generate calibration.yaml
+# → Calculates pixels_per_cm from scale dimensions
 ```
 
-**Important Notes**:
+#### Calibration Data Integration
 
-- Interactive calibration won't work in headless Docker containers (no display/keyboard)
-- For Docker deployments, use Method 1 (known height) or pre-generated calibration files
-- The `analyze_scale_photo.py` script is a helpful **analysis tool** but is separate from the calibration process
+**How the methods work together**:
+
+1. **Data Generation**: Both workflows create `data/calibration/calibration.yaml`
+2. **Source Tracking**: File includes metadata about which method generated it
+3. **Consistent Format**: Same data structure regardless of generation method
+4. **Automatic Updates**: Each calibration run updates the file with current settings
+
+**Generated calibration.yaml contains**:
+```yaml
+pixels_per_cm: 12.5                    # Calculated conversion factor
+image_path: data/calibration/...       # Source calibration image
+scale_height_cm: 450.0                 # Physical scale height
+calibration_date: '2024-08-26T...'     # Generation timestamp  
+reference_points:                      # Scale corner coordinates
+  top_of_scale: {x: 75, y: 1}
+  bottom_of_scale: {x: 190, y: 605}
+calibration_method: 'interactive_analysis'  # or 'known_height'
+confidence: 0.95
+notes: 'Generated by...'               # Source and method info
+```
+
+#### Method Selection Guide
+
+**Use Interactive Analysis When**:
+- Setting up system for first time
+- Scale boundaries are unclear or complex
+- Need water color detection setup  
+- Want maximum measurement accuracy
+- Scale position varies between images
+
+**Use Direct Calibration When**:
+- Config.yaml is already precisely configured
+- Scale position and size are consistent
+- Quick calibration update needed
+- Batch processing multiple similar setups
+
+#### Calibration Validation
+
+After either method, verify calibration accuracy:
+```bash
+# Test with debug mode to see detection results
+set DEBUG_MODE=true && python src/main.py
+# Check generated debug images in data/debug/
+# Verify scale detection boundaries and water line detection
+```
 
 ### Processing Images
 
@@ -342,7 +399,11 @@ set USE_GUI_SELECTOR=true && python src/main.py
 **Visual debugging mode:**
 
 ```bash
+# Option 1: Enable via environment variable (overrides config)
 set DEBUG_MODE=true && python src/main.py
+
+# Option 2: Enable via config.yaml (set debug.enabled: true)
+python src/main.py
 # Generates step-by-step annotated debug images
 ```
 
@@ -417,6 +478,47 @@ debug:
     - 'final_result'
 ```
 
+### Water Detection Methods
+
+The system provides three distinct water detection methods that can be selected in `config.yaml`:
+
+```yaml
+detection:
+  method: 'edge'    # Options: 'edge', 'color', 'gradient'
+```
+
+**Method Selection Guide:**
+
+- **`edge`** (default): Best for clear water-air interfaces with good contrast
+  - Uses Canny edge detection with optional color enhancement
+  - Most reliable for typical water level detection scenarios
+  - Works well with various lighting conditions
+
+- **`color`**: Best for colored water (algae, sediment, specific water conditions)
+  - Uses HSV color ranges to identify water regions: `water_hsv_lower/upper`
+  - Ideal when water has distinct color different from background
+  - Configure HSV ranges using the analyze_scale_photo.py tool
+
+- **`gradient`**: Best for subtle transitions and as fallback method
+  - Uses intensity gradient analysis to find water boundaries
+  - Useful when edge detection fails due to poor contrast
+  - Automatically used as fallback for other methods
+
+**Color-Based Water Detection Setup:**
+When using `method: 'color'`, configure the HSV ranges for your water:
+```yaml
+detection:
+  method: 'color'
+  water_hsv_lower: [100, 50, 50]   # Adjust based on your water color
+  water_hsv_upper: [130, 255, 255] # Use analyze_scale_photo.py to calibrate
+```
+
+Use the interactive analysis tool to determine optimal HSV ranges:
+```bash
+python src/calibration/analyze_scale_photo.py
+# Step 4: Click on water color for HSV range calibration
+```
+
 ### Scale Detection and Color Options
 
 The system uses advanced RGB/HSV color filtering to detect various types of measurement scales:
@@ -451,6 +553,65 @@ scale_colors:
 ```
 
 The color detection can be **enabled/disabled per color** and includes **extensive debug visualization** showing mask generation, edge enhancement, and contour analysis.
+
+## Data Export Options
+
+The system automatically exports measurement data in multiple formats based on your `config.yaml` settings. All exports are created in the `data/output/` directory with timestamped filenames to prevent overwrites.
+
+### Export Configuration
+
+```yaml
+output:
+  csv_export: true      # Export to CSV format
+  json_export: true     # Export to JSON format  
+  database: true        # Create database backups
+```
+
+### Export Formats
+
+**CSV Export (`csv_export: true`)**
+- Creates `measurements_YYYYMMDD_HHMMSS.csv` files
+- Includes all measurement data in tabular format
+- Compatible with Excel, data analysis tools
+- Best for: Spreadsheet analysis, reporting, graphs
+
+**JSON Export (`json_export: true`)**
+- Creates `measurements_YYYYMMDD_HHMMSS.json` files
+- Structured data with proper type handling
+- Easy parsing for web applications, APIs
+- Best for: Integration with other systems, custom analysis
+
+**Database Backup (`database: true`)**
+- Creates `measurements_YYYYMMDD_HHMMSS.db` backup files
+- Complete SQLite database copies
+- Preserves all data including processing metadata
+- Best for: Data archiving, system recovery
+
+### Export Behavior
+
+- **Automatic**: Exports occur after each batch of images is processed
+- **Timestamped**: Files include date/time to prevent overwrites
+- **Conditional**: Only enabled formats create files
+- **Error Handling**: Export failures don't stop image processing
+- **Directory Creation**: Output directories are created automatically
+
+**Example Output:**
+```
+data/output/
+├── measurements.db                    # Main database (always present)
+├── measurements_20250826_143022.csv  # CSV export (if enabled)
+├── measurements_20250826_143022.json # JSON export (if enabled)  
+└── measurements_20250826_143022.db   # Database backup (if enabled)
+```
+
+**Disable Exports:**
+Set any format to `false` to disable:
+```yaml
+output:
+  csv_export: false     # No CSV files created
+  json_export: false    # No JSON files created
+  database: false       # No database backups
+```
 
 ## Project Structure
 

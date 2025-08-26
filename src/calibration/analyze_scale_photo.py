@@ -32,28 +32,33 @@ def interactive_coordinate_picker(image, image_path):
     print("INTERACTIVE COORDINATE & COLOR PICKER")
     print("="*60)
     print("STEP 1: Click on the following scale boundary points in order:")
-    print("1. Top-left corner of scale")
-    print("2. Top-right corner of scale") 
-    print("3. Bottom-left corner of scale")
-    print("4. Bottom-right corner of scale")
-    print("\nSTEP 2: After 4 points, click on color samples:")
-    print("5. Click on scale background color")
-    print("6. Click on scale marking/text color")
-    print("\nControls: 'r' to reset, 'q' to quit, 's' to skip color selection")
+    print("IMPORTANT: Select the FULL scale boundaries, even if parts are underwater!")
+    print("1. Top-left corner of scale (above or below water)")
+    print("2. Top-right corner of scale (above or below water)") 
+    print("3. Bottom-left corner of scale (above or below water)")
+    print("4. Bottom-right corner of scale (above or below water)")
+    print("\nSTEP 2: After 4 points, click on scale color samples:")
+    print("5. Click on scale background color (preferably on visible portions)")
+    print("6. Click on scale marking/text color (preferably on visible portions)")
+    print("\nSTEP 3: After scale colors, click on water color sample:")
+    print("7. Click on water color (if visible in image)")
+    print("\nControls: 'r' to reset, 'q' to quit, 's' to skip color selection, 'w' to skip water color")
     
     # Create a copy for drawing
     display_image = image.copy()
     points = []
     color_samples = []
-    point_labels = ["Top-Left", "Top-Right", "Bottom-Left", "Bottom-Right", "Scale Background", "Scale Markings"]
-    colors = [(0, 255, 0), (0, 255, 255), (255, 0, 0), (255, 0, 255), (255, 255, 0), (0, 128, 255)]
+    water_samples = []
+    point_labels = ["Top-Left", "Top-Right", "Bottom-Left", "Bottom-Right", "Scale Background", "Scale Markings", "Water Color"]
+    colors = [(0, 255, 0), (0, 255, 255), (255, 0, 0), (255, 0, 255), (255, 255, 0), (0, 128, 255), (128, 255, 128)]
     
     # State tracking
     picking_corners = True
     picking_colors = False
+    picking_water = False
     
     def mouse_callback(event, x, y, flags, param):
-        nonlocal points, color_samples, display_image, picking_corners, picking_colors
+        nonlocal points, color_samples, water_samples, display_image, picking_corners, picking_colors, picking_water
         
         if event == cv2.EVENT_LBUTTONDOWN:
             if picking_corners and len(points) < 4:
@@ -112,6 +117,52 @@ def interactive_coordinate_picker(image, image_path):
                 if len(color_samples) == 2:
                     analyze_color_samples(image, points, color_samples)
                     picking_colors = False
+                    picking_water = True
+                    print("\n" + "="*60)
+                    print("STEP 3: WATER COLOR SELECTION")
+                    print("="*60)
+                    print("Now click on the WATER COLOR:")
+                    print("- Click on a representative water color in the image")
+                    print("- This helps calibrate water detection parameters")
+                    print("- Press 'w' to skip water color selection if no water visible")
+                    print("- Press 'q' to finish and continue with analysis")
+            
+            elif picking_water and len(water_samples) < 1:
+                # Handle water color sample selection
+                sample_idx = 6  # Water color index
+                water_samples.append((x, y))
+                color = colors[sample_idx]
+                
+                # Sample the color at clicked location
+                clicked_bgr = image[y, x]
+                clicked_hsv = cv2.cvtColor(np.array([[clicked_bgr]]), cv2.COLOR_BGR2HSV)[0][0]
+                
+                # Draw sample point
+                cv2.circle(display_image, (x, y), 8, color, -1)
+                cv2.circle(display_image, (x, y), 10, (255, 255, 255), 2)
+                cv2.putText(display_image, f"{sample_idx+1}: {point_labels[sample_idx]}", 
+                           (x+15, y-15), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                
+                # Show color info
+                print(f"\nWater color sampled at ({x}, {y}):")
+                print(f"  BGR: ({clicked_bgr[0]}, {clicked_bgr[1]}, {clicked_bgr[2]})")
+                print(f"  HSV: ({clicked_hsv[0]}, {clicked_hsv[1]}, {clicked_hsv[2]})")
+                
+                # Create color swatch for water
+                swatch_y = 20 + 3 * 40  # Below scale color swatches
+                cv2.rectangle(display_image, (20, swatch_y), (60, swatch_y+30), 
+                             tuple(map(int, clicked_bgr)), -1)
+                cv2.putText(display_image, "Water", (70, swatch_y+20), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                
+                cv2.imshow('Scale Analysis', display_image)
+                
+                # Analyze water color
+                analyze_water_color_sample(image, water_samples[0])
+                picking_water = False
+                print("\n" + "="*60)
+                print("ALL SELECTIONS COMPLETE - Press 'q' to continue with analysis")
+                print("="*60)
     
     cv2.namedWindow('Scale Analysis', cv2.WINDOW_NORMAL)
     cv2.resizeWindow('Scale Analysis', 800, 600)
@@ -126,19 +177,28 @@ def interactive_coordinate_picker(image, image_path):
             # Reset everything
             points = []
             color_samples = []
+            water_samples = []
             display_image = image.copy()
             picking_corners = True
             picking_colors = False
+            picking_water = False
             cv2.imshow('Scale Analysis', display_image)
-            print("Reset points and colors")
+            print("Reset points, colors, and water samples")
         elif key == ord('s') and picking_colors:
             # Skip color selection
             print("Skipping color selection")
             picking_colors = False
             break
+        elif key == ord('w') and picking_water:
+            # Skip water color selection
+            print("Skipping water color selection")
+            picking_water = False
+            print("\n" + "="*60)
+            print("WATER COLOR SKIPPED - Press 'q' to continue with analysis")
+            print("="*60)
     
     cv2.destroyAllWindows()
-    return points, color_samples
+    return points, color_samples, water_samples
 
 def analyze_picked_points(points, image_shape):
     """Analyze the manually picked points"""
@@ -226,6 +286,65 @@ def analyze_color_samples(image, corner_points, color_samples):
         }
     
     return sample_data
+
+def analyze_water_color_sample(image, water_sample):
+    """Analyze the interactively selected water color sample"""
+    if not water_sample:
+        return None
+    
+    print("\n" + "="*60)
+    print("WATER COLOR SAMPLE ANALYSIS")
+    print("="*60)
+    
+    # Convert image to HSV for analysis
+    hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    
+    x, y = water_sample
+    
+    # Sample area around clicked point (7x7 region for water)
+    sample_region_bgr = image[max(0, y-3):min(image.shape[0], y+4), 
+                             max(0, x-3):min(image.shape[1], x+4)]
+    sample_region_hsv = hsv_image[max(0, y-3):min(image.shape[0], y+4), 
+                                 max(0, x-3):min(image.shape[1], x+4)]
+    
+    # Calculate statistics
+    mean_bgr = np.mean(sample_region_bgr.reshape(-1, 3), axis=0)
+    mean_hsv = np.mean(sample_region_hsv.reshape(-1, 3), axis=0)
+    std_hsv = np.std(sample_region_hsv.reshape(-1, 3), axis=0)
+    
+    print(f"Water color analysis:")
+    print(f"  Position: ({x}, {y})")
+    print(f"  Average BGR: ({mean_bgr[0]:.0f}, {mean_bgr[1]:.0f}, {mean_bgr[2]:.0f})")
+    print(f"  Average HSV: ({mean_hsv[0]:.0f}, {mean_hsv[1]:.0f}, {mean_hsv[2]:.0f})")
+    print(f"  HSV Std Dev: ({std_hsv[0]:.1f}, {std_hsv[1]:.1f}, {std_hsv[2]:.1f})")
+    
+    # Generate HSV range suggestions with tolerance for water
+    h_tolerance = max(15, 2.5 * std_hsv[0])  # Larger tolerance for water hue
+    s_tolerance = max(60, 2.5 * std_hsv[1])  # Larger tolerance for water saturation
+    v_tolerance = max(60, 2.5 * std_hsv[2])  # Larger tolerance for water value
+    
+    h_lower = max(0, mean_hsv[0] - h_tolerance)
+    h_upper = min(179, mean_hsv[0] + h_tolerance)
+    s_lower = max(0, mean_hsv[1] - s_tolerance)
+    s_upper = min(255, mean_hsv[1] + s_tolerance)
+    v_lower = max(0, mean_hsv[2] - v_tolerance)
+    v_upper = min(255, mean_hsv[2] + v_tolerance)
+    
+    print(f"  Suggested HSV range: [{h_lower:.0f}, {s_lower:.0f}, {v_lower:.0f}] to [{h_upper:.0f}, {s_upper:.0f}, {v_upper:.0f}]")
+    print()
+    
+    water_data = {
+        'position': (x, y),
+        'mean_bgr': mean_bgr,
+        'mean_hsv': mean_hsv,
+        'std_hsv': std_hsv,
+        'hsv_range': {
+            'lower': [int(h_lower), int(s_lower), int(v_lower)],
+            'upper': [int(h_upper), int(s_upper), int(v_upper)]
+        }
+    }
+    
+    return water_data
 
 def automatic_edge_detection(image):
     """Automatic scale detection using edge detection"""
@@ -358,7 +477,7 @@ def color_analysis(image):
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-def generate_config_suggestions(image, manual_points=None, color_sample_data=None):
+def generate_config_suggestions(image, manual_points=None, color_sample_data=None, water_sample_data=None):
     """Generate config.yaml suggestions based on analysis"""
     print("\n" + "="*60)
     print("CONFIG.YAML SUGGESTIONS")
@@ -426,6 +545,13 @@ def generate_config_suggestions(image, manual_points=None, color_sample_data=Non
         print(f"        hsv_upper: {marking_data['hsv_range']['upper']}")
         print(f"        description: \"{mark_color_name.capitalize()} scale markings\"")
     
+    # Add water color configuration if water sample was provided
+    if water_sample_data:
+        print()
+        print("  # Water color detection (for color-based method)")
+        print("  water_hsv_lower:", water_sample_data['hsv_range']['lower'])
+        print("  water_hsv_upper:", water_sample_data['hsv_range']['upper'])
+    
     print()
     print("Additional notes:")
     print(f"- Scale region: {x_max-x_min} x {y_max-y_min} pixels")
@@ -434,6 +560,83 @@ def generate_config_suggestions(image, manual_points=None, color_sample_data=Non
     if color_sample_data:
         print(f"- Background color: {determine_color_name(color_sample_data[0]['mean_hsv']).capitalize()}")
         print(f"- Marking color: {determine_color_name(color_sample_data[1]['mean_hsv']).capitalize()}")
+    if water_sample_data:
+        water_color_name = determine_color_name(water_sample_data['mean_hsv'])
+        print(f"- Water color: {water_color_name.capitalize()}")
+
+def generate_calibration_data(image, manual_points, config_height_cm=None):
+    """Generate calibration.yaml data from analyzed scale points"""
+    if len(manual_points) != 4:
+        print("Cannot generate calibration data: Need exactly 4 corner points")
+        return None
+    
+    # Calculate scale dimensions from manual points
+    x_coords = [p[0] for p in manual_points]
+    y_coords = [p[1] for p in manual_points]
+    
+    scale_height_pixels = max(y_coords) - min(y_coords)
+    
+    # Use provided height or prompt user
+    if config_height_cm:
+        scale_height_cm = config_height_cm
+        print(f"\nUsing configured scale height: {scale_height_cm}cm")
+    else:
+        print(f"\nCalculated scale height: {scale_height_pixels} pixels")
+        try:
+            scale_height_cm = float(input("Enter the actual scale height in cm: "))
+        except (ValueError, EOFError):
+            print("Invalid input - using default 100cm")
+            scale_height_cm = 100.0
+    
+    # Calculate pixels per cm
+    pixels_per_cm = scale_height_pixels / scale_height_cm
+    
+    print(f"\nCalibration calculations:")
+    print(f"- Scale height in pixels: {scale_height_pixels}")
+    print(f"- Scale height in cm: {scale_height_cm}")
+    print(f"- Pixels per cm: {pixels_per_cm:.2f}")
+    
+    # Generate calibration data
+    from datetime import datetime
+    
+    calib_data = {
+        'pixels_per_cm': float(round(pixels_per_cm, 2)),
+        'image_path': 'data/calibration/calibration_image.jpg',
+        'scale_height_cm': float(scale_height_cm),
+        'calibration_date': datetime.now().isoformat(),
+        'reference_points': {
+            'top_of_scale': {
+                'x': int(min(x_coords)),
+                'y': int(min(y_coords))
+            },
+            'bottom_of_scale': {
+                'x': int(max(x_coords)), 
+                'y': int(max(y_coords))
+            }
+        },
+        'calibration_method': 'interactive_analysis',
+        'confidence': 0.95,
+        'notes': 'Generated by analyze_scale_photo.py interactive analysis tool'
+    }
+    
+    return calib_data
+
+def save_calibration_data(calib_data):
+    """Save calibration data to calibration.yaml"""
+    import yaml
+    from pathlib import Path
+    
+    calib_file = Path('data/calibration/calibration.yaml')
+    calib_file.parent.mkdir(parents=True, exist_ok=True)
+    
+    with open(calib_file, 'w') as f:
+        f.write('# Calibration data - generated by analyze_scale_photo.py\n')
+        f.write('# This file can be used by the main calibration system\n')
+        f.write('# Run with CALIBRATION_MODE=true to use this data\n\n')
+        yaml.dump(calib_data, f, default_flow_style=False, sort_keys=False)
+    
+    print(f"\nCalibration data saved to: {calib_file}")
+    return calib_file
 
 def determine_color_name(hsv_values):
     """Determine the most appropriate color name based on HSV values"""
@@ -442,11 +645,14 @@ def determine_color_name(hsv_values):
     # Define color ranges in HSV space
     if v < 50:  # Very dark
         return "black"
-    elif s < 30 and v > 200:  # Low saturation, high value
-        return "white"
-    elif s < 50:  # Low saturation (grayish)
-        return "gray" if v < 150 else "white"
-    else:  # Colored regions
+    elif s < 60:  # Low saturation (white/gray family)
+        if v > 180:  # High brightness = white
+            return "white"
+        elif v > 100:  # Medium brightness = light gray
+            return "light_gray"
+        else:  # Lower brightness = gray
+            return "gray"
+    else:  # Colored regions - higher saturation
         if 0 <= h <= 10 or 170 <= h <= 179:  # Red range (wraps around)
             return "red"
         elif 10 < h <= 25:
@@ -498,12 +704,17 @@ def main():
     
     # 2. Interactive coordinate and color picker
     print(f"\nStarting interactive analysis...")
-    manual_points, color_samples = interactive_coordinate_picker(image, image_path)
+    manual_points, color_samples, water_samples = interactive_coordinate_picker(image, image_path)
     
     # Analyze color samples if provided
     color_sample_data = None
     if len(color_samples) == 2:
         color_sample_data = analyze_color_samples(image, manual_points, color_samples)
+    
+    # Analyze water sample if provided
+    water_sample_data = None
+    if len(water_samples) == 1:
+        water_sample_data = analyze_water_color_sample(image, water_samples[0])
     
     # 3. Automatic edge detection
     automatic_edge_detection(image)
@@ -511,8 +722,36 @@ def main():
     # 4. Color analysis (traditional method for comparison)
     color_analysis(image)
     
-    # 5. Generate suggestions with color data
-    generate_config_suggestions(image, manual_points, color_sample_data)
+    # 5. Generate suggestions with color and water data
+    generate_config_suggestions(image, manual_points, color_sample_data, water_sample_data)
+    
+    # 6. Optionally generate calibration data
+    if len(manual_points) == 4:
+        print("\n" + "="*60)
+        print("CALIBRATION DATA GENERATION")
+        print("="*60)
+        print("Would you like to generate calibration data for the detected scale?")
+        print("This will create/update data/calibration/calibration.yaml")
+        
+        # Load config to get scale height if available
+        try:
+            import yaml
+            with open('config.yaml', 'r') as f:
+                config = yaml.safe_load(f)
+            config_height = config.get('scale', {}).get('total_height')
+        except:
+            config_height = None
+        
+        try:
+            response = input("Generate calibration data? [y/N]: ").strip().lower()
+            if response in ['y', 'yes']:
+                calib_data = generate_calibration_data(image, manual_points, config_height)
+                if calib_data:
+                    save_calibration_data(calib_data)
+                    print("\nCalibration data generated successfully!")
+                    print("You can now use this with: CALIBRATION_MODE=true python src/main.py")
+        except (EOFError, KeyboardInterrupt):
+            print("\nSkipping calibration data generation")
     
     print(f"\nAnalysis complete! Use the suggested values to update your config.yaml")
 

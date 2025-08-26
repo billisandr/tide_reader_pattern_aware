@@ -75,11 +75,12 @@ def main():
     config = load_config()
     
     # Initialize components
-    db_path = os.environ.get('DB_PATH', 'data/output/measurements.db')
+    db_path = Path(os.environ.get('DB_PATH', 'data/output/measurements.db'))
+    db_path.parent.mkdir(parents=True, exist_ok=True)  # Ensure DB directory exists
+    
     logger.info(f"Database path: {db_path}")
-    logger.info(f"Database file exists: {os.path.exists(db_path)}")
-    os.makedirs(os.path.dirname(db_path), exist_ok=True)
-    db_manager = DatabaseManager(db_path)
+    logger.info(f"Database file exists: {db_path.exists()}")
+    db_manager = DatabaseManager(str(db_path))
     calibration_manager = CalibrationManager(config)
     
     # Check if calibration mode
@@ -99,12 +100,25 @@ def main():
     # Initialize detector
     detector = WaterLevelDetector(config, pixels_per_cm)
     
-    # Processing loop
+    # Processing loop  
     process_interval = int(os.environ.get('PROCESS_INTERVAL', 60))
-    #input_dir = Path(os.path.join(os.getcwd(), 'data', 'input'))
-    processed_dir = Path(os.path.join(os.getcwd(), 'data', 'processed'))
+    #input_dir = Path('data/input')
+    processed_dir = Path('data/processed')
+    output_dir = Path('data/output')
+    
+    # Ensure directories exist
+    processed_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Check if any export formats are enabled
+    export_enabled = (config.get('output', {}).get('csv_export', False) or 
+                     config.get('output', {}).get('json_export', False) or 
+                     config.get('output', {}).get('database', False))
     
     logger.info(f"Starting main processing loop (interval: {process_interval}s)")
+    logger.info(f"Export formats enabled: CSV={config.get('output', {}).get('csv_export', False)}, "
+               f"JSON={config.get('output', {}).get('json_export', False)}, "
+               f"DB={config.get('output', {}).get('database', False)}")
     
     while True:
         try:
@@ -143,6 +157,14 @@ def main():
                     except Exception as e:
                         logger.error(f"Error processing {image_path}: {e}")
                         continue
+                
+                # Export data in configured formats after processing batch
+                if export_enabled:
+                    try:
+                        db_manager.export_all_formats(output_dir, config)
+                        logger.debug("Exported measurements in configured formats")
+                    except Exception as e:
+                        logger.error(f"Error exporting data: {e}")
             else:
                 logger.debug("No new images to process")
             

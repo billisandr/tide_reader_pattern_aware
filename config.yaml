@@ -6,10 +6,10 @@ scale:
   width: 8.0
   # Scale position in image (if fixed)
   expected_position:
-    x_min: 81
-    x_max: 181
+    x_min: 75
+    x_max: 190
     y_min: 1
-    y_max: 603
+    y_max: 605
   
   # RGB/HSV color-based scale detection
   color_detection:
@@ -20,13 +20,13 @@ scale:
     # Scale color definitions (HSV ranges)
     scale_colors:
       yellow:
-        enabled: true
+        enabled: false
         hsv_lower: [20, 100, 100]
         hsv_upper: [30, 255, 255]
         description: "Yellow scale background"
       
       white:
-        enabled: true
+        enabled: false
         hsv_lower: [1, 0, 0]
         hsv_upper: [164, 108, 255]
         description: "White scale background"
@@ -39,24 +39,24 @@ scale:
 
       black:
         enabled: true
-        hsv_lower: [97, 0, 0]
-        hsv_upper: [129, 92, 87]
+        hsv_lower: [107, 0, 0]
+        hsv_upper: [131, 79, 85]
         description: "Black scale markings"
       
       red:
-        enabled: true
+        enabled: false
         hsv_lower: [0, 100, 100]
         hsv_upper: [10, 255, 255]
         description: "Red scale background"
       
       red_alt:
-        enabled: true
+        enabled: false
         hsv_lower: [170, 100, 100]
         hsv_upper: [180, 255, 255]
         description: "Red scale background (alt range)"
       
       white_markings:
-        enabled: true
+        enabled: false
         hsv_lower: [0, 0, 220]
         hsv_upper: [180, 20, 255]
         description: "White scale markings on colored backgrounds"
@@ -71,12 +71,12 @@ calibration:
   # Pixels per centimeter (will be calculated during calibration)
   pixels_per_cm: null
   # Reference water level for calibration (cm)
-  reference_water_level: 50.0
+  reference_water_level: 150.0
 
 detection:
   # Water line detection parameters
-  edge_threshold_low: 50
-  edge_threshold_high: 150
+  edge_threshold_low: 10
+  edge_threshold_high: 450
   blur_kernel_size: 7
   min_contour_area: 500
   
@@ -84,8 +84,8 @@ detection:
   method: 'edge'
   
   # Color-based detection (HSV ranges for water)
-  water_hsv_lower: [100, 50, 50]
-  water_hsv_upper: [130, 255, 255]
+  water_hsv_lower: [83, 20, 101]
+  water_hsv_upper: [113, 140, 221]
 
 processing:
   # Image processing settings
@@ -101,7 +101,7 @@ output:
 
 debug:
   # Visual debugging options
-  enabled: false
+  enabled: true
   save_debug_images: true
   debug_output_dir: 'data/debug'
   annotation_color: [0, 255, 0]  # Green BGR

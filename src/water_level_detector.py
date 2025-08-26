@@ -5,6 +5,7 @@ Water level detection module adapted from prateekralhan's approach.
 import cv2
 import numpy as np
 import os
+from pathlib import Path
 from scipy.spatial import distance as dist
 from imutils import perspective, contours
 import imutils
@@ -24,6 +25,9 @@ class WaterLevelDetector:
         self.edge_low = config['detection']['edge_threshold_low']
         self.edge_high = config['detection']['edge_threshold_high']
         self.blur_kernel = config['detection']['blur_kernel_size']
+        self.detection_method = config['detection'].get('method', 'edge')
+        self.water_hsv_lower = np.array(config['detection'].get('water_hsv_lower', [100, 50, 50]))
+        self.water_hsv_upper = np.array(config['detection'].get('water_hsv_upper', [130, 255, 255]))
         
         # Scale parameters
         self.scale_height_cm = config['scale']['total_height']
@@ -35,13 +39,42 @@ class WaterLevelDetector:
         self.morphology_config = config['scale']['color_detection']['morphology']
         self.debug_color_masks = config['scale']['color_detection']['debug_color_masks']
         
-        # Initialize debug visualizer
-        debug_enabled = os.environ.get('DEBUG_MODE', 'false').lower() == 'true'
+        # Initialize debug visualizer with priority: DEBUG_MODE env var > config.debug.enabled > false
+        config_debug = config.get('debug', {}).get('enabled', False)
+        env_debug_set = 'DEBUG_MODE' in os.environ
+        env_debug = os.environ.get('DEBUG_MODE', 'false').lower() == 'true'
+        
+        debug_enabled = env_debug if env_debug_set else config_debug
+        
+        # Log which debug setting is being used for clarity
+        logger = logging.getLogger(__name__)
+        if env_debug_set:
+            logger.info(f"Debug mode: Environment DEBUG_MODE={env_debug} (overrides config)")
+        else:
+            logger.info(f"Debug mode: Config debug.enabled={config_debug}")
+            
         self.debug_viz = DebugVisualizer(config, enabled=debug_enabled)
     
     def detect_water_line(self, image):
         """
-        Detect the water line in the image using enhanced color-based edge detection.
+        Detect the water line in the image using the configured detection method.
+        Returns y-coordinate of water line.
+        """
+        # Log which detection method is being used
+        self.logger.debug(f"Using detection method: {self.detection_method}")
+        
+        # Route to appropriate detection method
+        if self.detection_method == 'color':
+            return self.detect_water_line_color(image)
+        elif self.detection_method == 'gradient':
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            return self.detect_water_line_gradient(gray)
+        else:  # default to 'edge' method
+            return self.detect_water_line_edge(image)
+    
+    def detect_water_line_edge(self, image):
+        """
+        Detect the water line using edge detection (original method).
         Returns y-coordinate of water line.
         """
         # Convert to grayscale
@@ -160,6 +193,76 @@ class WaterLevelDetector:
                 return water_line_y
         
         # Fallback: detect using gradient changes
+        return self.detect_water_line_gradient(gray)
+    
+    def detect_water_line_color(self, image):
+        """
+        Detect the water line using color-based water detection.
+        Returns y-coordinate of water line.
+        """
+        # Convert to HSV color space
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        
+        # Create water mask using configured HSV ranges
+        water_mask = cv2.inRange(hsv, self.water_hsv_lower, self.water_hsv_upper)
+        
+        # Focus on scale region if defined
+        if self.scale_region:
+            roi_mask = water_mask[
+                self.scale_region['y_min']:self.scale_region['y_max'],
+                self.scale_region['x_min']:self.scale_region['x_max']
+            ]
+            roi_offset_x = self.scale_region['x_min']
+            roi_offset_y = self.scale_region['y_min']
+        else:
+            roi_mask = water_mask
+            roi_offset_x = 0
+            roi_offset_y = 0
+        
+        # Debug: Save water mask
+        self.debug_viz.save_debug_image(
+            water_mask, 'water_color_mask',
+            info_text=[
+                f"Water HSV range: {self.water_hsv_lower} - {self.water_hsv_upper}",
+                f"Mask pixels: {cv2.countNonZero(roi_mask)}"
+            ]
+        )
+        
+        # Find horizontal water boundaries
+        # Look for horizontal transitions from non-water to water
+        horizontal_sums = np.sum(roi_mask, axis=1)  # Sum each row
+        
+        # Find the topmost significant water region
+        threshold = roi_mask.shape[1] * 0.3  # At least 30% of width should be water
+        water_rows = np.where(horizontal_sums > threshold)[0]
+        
+        if len(water_rows) > 0:
+            water_line_y = water_rows[0] + roi_offset_y  # Top of water region
+            
+            # Debug: Show water line detection
+            water_annotations = {
+                'lines': [{
+                    'x1': roi_offset_x, 'y1': water_line_y,
+                    'x2': roi_offset_x + roi_mask.shape[1], 'y2': water_line_y,
+                    'color': (0, 255, 0), 'label': 'Color-based Water Line'
+                }]
+            }
+            self.debug_viz.save_debug_image(
+                image, 'water_detection',
+                annotations=water_annotations,
+                info_text=[
+                    f"Color-based detection",
+                    f"Water line at y={water_line_y}",
+                    f"Water rows found: {len(water_rows)}"
+                ]
+            )
+            
+            self.logger.debug(f"Color-based water detection: y={water_line_y}")
+            return water_line_y
+        
+        # Fallback to gradient method if color detection fails
+        self.logger.debug("Color-based detection failed, falling back to gradient")
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         return self.detect_water_line_gradient(gray)
     
     def detect_water_line_gradient(self, gray_image):
@@ -672,6 +775,20 @@ class WaterLevelDetector:
         cv2.putText(annotated, text, (10, 30), 
                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         
-        # Save annotated image
-        output_path = f"/app/data/processed/annotated_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
-        cv2.imwrite(output_path, annotated)
+        # Save annotated image using configured format
+        image_format = self.config['processing'].get('image_format', 'jpg')
+        # Ensure format starts with dot
+        if not image_format.startswith('.'):
+            image_format = '.' + image_format
+        
+        # Use relative path with proper directory creation
+        processed_dir = Path('data/processed')
+        processed_dir.mkdir(parents=True, exist_ok=True)
+        
+        output_path = processed_dir / f"annotated_{datetime.now().strftime('%Y%m%d_%H%M%S')}{image_format}"
+        success = cv2.imwrite(str(output_path), annotated)
+        
+        if success:
+            self.logger.debug(f"Saved processed image: {output_path}")
+        else:
+            self.logger.warning(f"Failed to save processed image: {output_path}")
