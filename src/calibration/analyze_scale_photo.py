@@ -465,7 +465,7 @@ def determine_color_name(hsv_values):
 def main():
     # Default to calibration image in data/calibration/ directory
     # Adjust path since we're now in src/calibration/ subdirectory
-    default_image_path = "../../data/calibration/calibration_image.jpg"
+    default_image_path = "data/calibration/calibration_image.jpg"
     
     print("Scale Configuration Analysis Tool")
     print("="*50)

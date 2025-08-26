@@ -12,7 +12,7 @@
 
 This system provides automated water/tide level detection and measurement using computer vision techniques. Designed for fixed camera setups with calibrated measurement scales, it processes images continuously and stores precise measurements in a database.
 
-** 🔴 Key Applications:**
+**🔴 Key Applications:**
 
 - Tide monitoring stations
 - River water level monitoring
@@ -25,11 +25,11 @@ This system provides automated water/tide level detection and measurement using 
 - **Precise Calibration**: One-time setup for fixed camera-scale configurations  
 - **Advanced Scale Detection**: RGB/HSV color filtering for various scale types and markings
 - **Multiple Detection Methods**: Edge detection, color-based analysis, and gradient methods
-- ** 🔴 Database Storage**: SQLite database with comprehensive measurement history
+- **🔴 Database Storage**: SQLite database with comprehensive measurement history
 - **Docker Ready**: Fully containerized deployment with HTTPS server
 - **GUI Interface**: Optional tkinter interface for directory selection
-- ** 🔴 Export Options**: CSV, JSON, and database export capabilities
-- ** 🔴 Web Interface**: HTTPS server for remote access and image upload
+- **🔴 Export Options**: CSV, JSON, and database export capabilities
+- **🔴 Web Interface**: HTTPS server for remote access and image upload
 - **Reporting**: Automated measurement reports and visualizations
 
 ## Quick Start
@@ -279,6 +279,7 @@ The `CalibrationManager` provides two calibration methods. **Important**: The `a
 
 **When used**: If `config['scale']['total_height']` is set in config.yaml  
 **How it works**:
+
 - Uses `detect_scale_height_pixels()` to find the scale using edge detection  
 - Automatically detects the tallest vertical object (assumed to be the scale)
 - Calculates `pixels_per_cm = detected_pixels / known_height_cm`
@@ -297,6 +298,7 @@ set CALIBRATION_MODE=true && python src/main.py
 
 **When used**: If `config['scale']['total_height']` is NOT set or is null  
 **How it works**:
+
 - Opens OpenCV window showing the calibration image
 - User clicks on two points: top and bottom of the scale
 - System prompts: `"Enter the actual height in cm:"`
@@ -316,6 +318,7 @@ set CALIBRATION_MODE=true && python src/main.py
 ```
 
 **Important Notes**:
+
 - Interactive calibration won't work in headless Docker containers (no display/keyboard)
 - For Docker deployments, use Method 1 (known height) or pre-generated calibration files
 - The `analyze_scale_photo.py` script is a helpful **analysis tool** but is separate from the calibration process
@@ -597,7 +600,7 @@ When troubleshooting detection issues, use visual debugging to:
 
 ### Production Docker Deployment
 
-1. ** 🔴 Setup SSL certificates:**
+1. **🔴 Setup SSL certificates:**
 
 ```bash
 # Generate self-signed certificates
@@ -625,6 +628,7 @@ docker compose -f docker-compose.yml up -d
 ```
 
 **For GUI applications in Docker (X11 forwarding):**
+
 ```bash
 docker run -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix your-image
 ```
@@ -678,7 +682,7 @@ We welcome contributions! Here's how to get started:
 
 This project is licensed under the BSD 3-Clause License. See [LICENSE](LICENSE) file for details.
 
-##  🔴 Acknowledgments
+## 🔴 Acknowledgments
 
 This work incorporates ideas and code from several open-source projects:
 
