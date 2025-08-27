@@ -55,6 +55,15 @@ class CalibrationManager:
             self.logger.error("Failed to load calibration image")
             return False
         
+        # Apply same resize as processing pipeline to ensure coordinate consistency
+        if self.config['processing']['resize_width']:
+            height, width = image.shape[:2]
+            new_width = self.config['processing']['resize_width']
+            new_height = int(height * (new_width / width))
+            image = cv2.resize(image, (new_width, new_height))
+            self.logger.info(f"Resized calibration image: {width}x{height} -> {new_width}x{new_height}")
+            self.logger.info("This ensures scale coordinates match processing pipeline")
+        
         # Method 1: Known scale height
         if self.config['scale']['total_height']:
             pixels_per_cm = self.calibrate_with_known_height(image)

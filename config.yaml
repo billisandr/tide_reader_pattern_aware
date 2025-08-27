@@ -81,7 +81,7 @@ detection:
   min_contour_area: 500
   
   # Water detection method: 'edge', 'color', 'gradient'
-  method: 'gradient'
+  method: 'edge'
   
   # Color-based detection (HSV ranges for water)
   water_hsv_lower: [75, 11, 87]
