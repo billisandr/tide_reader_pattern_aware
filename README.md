@@ -244,75 +244,98 @@ debug:
 
 ## Usage
 
-### Scale Configuration Analysis
+### Enhanced Scale Configuration Analysis
 
-**Before calibration**, use the scale analysis tool to determine optimal configuration values:
+**Before calibration**, use the enhanced scale analysis tool to determine optimal configuration values with waterline detection:
 
 ```bash
 # 1. Place your scale image as data/calibration/calibration_image.jpg
-# 2. Run the scale analysis tool
+# 2. Run the enhanced scale analysis tool
 python src/calibration/analyze_scale_photo.py
 ```
 
-**The analysis tool provides:**
+**The enhanced analysis tool provides:**
 
-- **Interactive coordinate picker**: Click on scale corners to define boundaries
-- **Interactive color selection**: Click on scale background and marking colors
-- **Interactive water color sampling**: Click on water color for detection parameter calibration
+- **🆕 Enhanced waterline detection**: Mark actual waterline position on scale for precise calibration
+- **🆕 Real measurement inputs**: Enter actual scale readings for accurate cm/pixel calculation
+- **Interactive scale boundary picker**: Click on full visible scale corners (even if partially underwater)
+- **Interactive color selection**: Click on scale background and marking colors (optional)
+- **Interactive water color sampling**: Click on water color for detection parameter calibration (optional)
 - **Automatic edge detection**: Finds potential scale edges using computer vision
 - **Color analysis**: Analyzes selected scale and water colors for RGB/HSV detection setup
 - **Configuration suggestions**: Generates optimal config.yaml values with custom color ranges
 
-**Analysis workflow:**
+**🆕 Enhanced Analysis Workflow:**
 
 1. **Basic image analysis**: Shows dimensions and file info
-2. **Interactive boundary selection**: Click 4 corner points (top-left, top-right, bottom-left, bottom-right of scale)
-3. **Interactive color sampling**: Click on scale background color, then on marking/text color
-4. **Interactive water sampling**: Click on water color (if visible) for detection calibration
-5. **Edge detection**: Automatically finds vertical/horizontal lines
-6. **Color analysis**: Processes selected colors and generates precise HSV ranges
-7. **Config generation**: Provides ready-to-use config.yaml values with scale and water colors
+2. **🆕 Scale boundary selection**: Click 4 corner points of FULL visible scale (top-left, top-right, bottom-left, bottom-right)
+   - Select entire visible scale even if parts are underwater
+3. **🆕 Waterline marking**: Click 2 points on left and right edges of scale at waterline position
+4. **🆕 Scale measurement input**:
+   - Enter scale reading at TOP of outlined scale (e.g., 485 cm)
+   - Enter scale reading at WATERLINE position (e.g., 420 cm)
+   - System calculates precise pixels/cm from measurement difference
+5. **Interactive color sampling** (optional): Click on scale background color, then on marking/text color
+6. **Interactive water sampling** (optional): Click on water color (if visible) for detection calibration
+7. **Automatic analysis**: Edge detection and color analysis
+8. **Enhanced config generation**: Provides ready-to-use config.yaml values plus accurate calibration data
+
+**🆕 Key Advantages of Enhanced Workflow:**
+
+- **More Accurate Calibration**: Uses actual measured scale segment instead of estimated total height
+- **Waterline Aware**: Directly captures current water level during calibration
+- **Handles Partial Submersion**: Works with scales that are partially underwater
+- **Precise Measurements**: Real scale readings provide exact cm/pixel ratio
+- **Better Water Detection**: Waterline reference improves water level detection accuracy
 
 ### Calibration System
 
 The system provides two integrated calibration workflows that work together to provide accurate water level measurements.
 
-#### Workflow 1: Interactive Analysis + Calibration (Recommended)
+#### Workflow 1: 🆕 Enhanced Interactive Analysis + Calibration (Recommended)
 
-**Best for**: New setups, precise measurements, custom configurations
+**Best for**: New setups, precise measurements, waterline-aware calibration, partially submerged scales
 
-**Complete Process**:
+**🆕 Enhanced Complete Process**:
+
 ```bash
-# Step 1: Interactive scale analysis (generates both config.yaml suggestions AND calibration data)
+# Step 1: Enhanced interactive scale analysis with waterline detection
 python src/calibration/analyze_scale_photo.py
-# → Select 4 scale corners interactively 
-# → Choose scale background/marking colors
+# → Select 4 corners of FULL visible scale (even if partially underwater)
+# → Mark waterline position on scale (2 points: left and right edges)
+# → Enter actual scale readings at top and waterline positions
+# → System calculates precise pixels/cm from real measurements
+# → Choose scale background/marking colors (optional)
 # → Sample water color (optional)
-# → Generates config.yaml suggestions
-# → Optionally generates calibration.yaml with precise pixels_per_cm
+# → Generates config.yaml suggestions AND accurate calibration data
 
-# Step 2: Apply the analysis results
+# Step 2: Apply the enhanced analysis results
 # - Update your config.yaml with suggested values
-# - Use generated calibration.yaml data
+# - Enhanced calibration.yaml is automatically generated with waterline data
 
-# Step 3: Run calibration (uses generated data)
+# Step 3: Run calibration (uses enhanced waterline-aware data)
 set CALIBRATION_MODE=true && python src/main.py
-# → Loads calibration.yaml (if generated in Step 1)
-# → OR calculates from config.yaml settings
-# → Ready for water level detection
+# → Loads enhanced calibration.yaml with waterline reference
+# → Uses actual measured cm/pixel ratio
+# → Ready for highly accurate water level detection
 ```
 
-**Advantages**:
-- **Most accurate**: Interactive corner selection provides precise measurements
-- **Complete setup**: Handles both configuration AND calibration in one workflow  
+**🆕 Enhanced Advantages**:
+
+- **Highest accuracy**: Uses actual scale measurements instead of estimates
+- **Waterline-aware**: Directly incorporates current water level into calibration
+- **Handles submersion**: Works perfectly with partially underwater scales
+- **Real measurements**: No guessing - uses actual scale readings for calibration
+- **Complete setup**: Handles configuration, calibration, AND waterline detection
 - **Color calibration**: Includes water color detection setup
-- **User control**: Full control over scale boundary definition
+- **User control**: Full control over scale boundaries and measurement points
 
 #### Workflow 2: Direct Configuration Calibration (Legacy)
 
 **Best for**: Quick setup, when you already have precise config.yaml settings
 
 **Process**:
+
 ```bash
 # Step 1: Ensure config.yaml has accurate scale settings
 # scale:
@@ -341,38 +364,68 @@ set CALIBRATION_MODE=true && python src/main.py
 3. **Consistent Format**: Same data structure regardless of generation method
 4. **Automatic Updates**: Each calibration run updates the file with current settings
 
-**Generated calibration.yaml contains**:
+**🆕 Enhanced generated calibration.yaml contains**:
+
 ```yaml
-pixels_per_cm: 12.5                    # Calculated conversion factor
+pixels_per_cm: 12.546                  # Precise conversion factor from real measurements
 image_path: data/calibration/...       # Source calibration image
-scale_height_cm: 450.0                 # Physical scale height
-calibration_date: '2024-08-26T...'     # Generation timestamp  
-reference_points:                      # Scale corner coordinates
-  top_of_scale: {x: 75, y: 1}
-  bottom_of_scale: {x: 190, y: 605}
-calibration_method: 'interactive_analysis'  # or 'known_height'
-confidence: 0.95
-notes: 'Generated by...'               # Source and method info
+calibration_date: '2024-08-26T...'     # Generation timestamp
+image_dimensions:                      # Image metadata
+  width: 3024
+  height: 4032
+  resized: false
+scale_measurements:                    # 🆕 Actual scale readings
+  top_measurement_cm: 485.0           # Scale reading at top
+  waterline_measurement_cm: 420.0     # Scale reading at waterline
+  measurement_difference_cm: 65.0      # Actual measured difference
+  current_water_level_cm: 420.0       # Current water level
+reference_points:                      # Enhanced reference points
+  top_of_scale: {x: 75, y: 45}        # Top of scale boundary
+  bottom_of_scale: {x: 190, y: 580}   # Bottom of scale boundary
+  waterline:                          # 🆕 Waterline position data
+    x_left: 78
+    y_left: 245
+    x_right: 185
+    y_right: 247
+    y_average: 246
+scale_boundaries:                      # 🆕 Complete boundary data
+  x_min: 75
+  x_max: 190
+  y_min: 45
+  y_max: 580
+  x_min_pct: 0.025                    # Percentage coordinates
+  x_max_pct: 0.063
+  y_min_pct: 0.011
+  y_max_pct: 0.144
+calibration_method: 'enhanced_interactive_waterline'  # Enhanced method
+confidence: 0.98                       # Higher confidence with real measurements
+notes: 'Generated by enhanced analyze_scale_photo.py with waterline detection...'
 ```
 
 #### Method Selection Guide
 
-**Use Interactive Analysis When**:
+**🆕 Use Enhanced Interactive Analysis When**:
+
 - Setting up system for first time
+- Scale is partially underwater/submerged
+- Need waterline-aware calibration
+- Want maximum measurement accuracy with real scale readings
 - Scale boundaries are unclear or complex
-- Need water color detection setup  
-- Want maximum measurement accuracy
+- Need water color detection setup
 - Scale position varies between images
+- **Recommended for all new installations**
 
 **Use Direct Calibration When**:
-- Config.yaml is already precisely configured
-- Scale position and size are consistent
-- Quick calibration update needed
-- Batch processing multiple similar setups
+
+- Config.yaml is already precisely configured from previous interactive analysis
+- Scale position and size are completely consistent
+- Quick calibration update needed (not recommended for accuracy)
+- Batch processing multiple identical setups
 
 #### Calibration Validation
 
 After either method, verify calibration accuracy:
+
 ```bash
 # Test with debug mode to see detection results
 set DEBUG_MODE=true && python src/main.py
@@ -506,6 +559,7 @@ detection:
 
 **Color-Based Water Detection Setup:**
 When using `method: 'color'`, configure the HSV ranges for your water:
+
 ```yaml
 detection:
   method: 'color'
@@ -514,6 +568,7 @@ detection:
 ```
 
 Use the interactive analysis tool to determine optimal HSV ranges:
+
 ```bash
 python src/calibration/analyze_scale_photo.py
 # Step 4: Click on water color for HSV range calibration
@@ -570,18 +625,21 @@ output:
 ### Export Formats
 
 **CSV Export (`csv_export: true`)**
+
 - Creates `measurements_YYYYMMDD_HHMMSS.csv` files
 - Includes all measurement data in tabular format
 - Compatible with Excel, data analysis tools
 - Best for: Spreadsheet analysis, reporting, graphs
 
 **JSON Export (`json_export: true`)**
+
 - Creates `measurements_YYYYMMDD_HHMMSS.json` files
 - Structured data with proper type handling
 - Easy parsing for web applications, APIs
 - Best for: Integration with other systems, custom analysis
 
 **Database Backup (`database: true`)**
+
 - Creates `measurements_YYYYMMDD_HHMMSS.db` backup files
 - Complete SQLite database copies
 - Preserves all data including processing metadata
@@ -596,6 +654,7 @@ output:
 - **Directory Creation**: Output directories are created automatically
 
 **Example Output:**
+
 ```
 data/output/
 ├── measurements.db                    # Main database (always present)
@@ -606,6 +665,7 @@ data/output/
 
 **Disable Exports:**
 Set any format to `false` to disable:
+
 ```yaml
 output:
   csv_export: false     # No CSV files created
@@ -705,15 +765,36 @@ The project follows standard Python conventions:
 
 **"System not calibrated" error:**
 
-- Ensure calibration file exists in `data/calibration/`
+- Ensure calibration file exists in `data/calibration/calibration.yaml`
 - Check calibration file path in logs
-- Run calibration mode first
+- Run enhanced calibration: `python src/calibration/analyze_scale_photo.py` then `CALIBRATION_MODE=true python src/main.py`
+
+**🆕 Scale detection completely missing/wrong:**
+
+- **Most likely cause**: Image resizing mismatch with hardcoded coordinates
+- **Solution**: Disable resizing in config.yaml: `resize_width: null`
+- **Better solution**: Use enhanced calibration with percentage coordinates
+- **Temporary fix**: Run `python src/calibration/analyze_scale_photo.py` to get correct coordinates
+
+**🆕 Waterline detection inaccurate:**
+
+- Use enhanced calibration workflow: `python src/calibration/analyze_scale_photo.py`
+- Mark waterline position during calibration for reference
+- Enter actual scale measurements for precise cm/pixel calculation
+- Ensure scale is properly outlined even if partially underwater
 
 **No images being processed:**
 
 - Verify image directory permissions
 - Check database path configuration
 - Clear database if paths have changed: `rm data/output/measurements.db`
+
+**🆕 Enhanced calibration tool not starting:**
+
+- Ensure display is available (not headless environment)
+- Check OpenCV GUI support: `python -c "import cv2; cv2.imshow('test', cv2.imread('image.jpg')); cv2.waitKey(1000)"`
+- For WSL: Enable X11 forwarding or use Windows Python
+- Run from project root directory
 
 **GUI directory selector not appearing:**
 

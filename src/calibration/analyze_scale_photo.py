@@ -27,67 +27,89 @@ def analyze_image_basic(image_path):
     return image
 
 def interactive_coordinate_picker(image, image_path):
-    """Interactive tool to pick scale coordinates and colors"""
+    """Enhanced interactive tool for scale analysis with waterline detection"""
     print("\n" + "="*60)
-    print("INTERACTIVE COORDINATE & COLOR PICKER")
+    print("ENHANCED SCALE & WATERLINE ANALYSIS")
     print("="*60)
-    print("STEP 1: Click on the following scale boundary points in order:")
-    print("IMPORTANT: Select the FULL scale boundaries, even if parts are underwater!")
-    print("1. Top-left corner of scale (above or below water)")
-    print("2. Top-right corner of scale (above or below water)") 
-    print("3. Bottom-left corner of scale (above or below water)")
-    print("4. Bottom-right corner of scale (above or below water)")
-    print("\nSTEP 2: After 4 points, click on scale color samples:")
-    print("5. Click on scale background color (preferably on visible portions)")
-    print("6. Click on scale marking/text color (preferably on visible portions)")
-    print("\nSTEP 3: After scale colors, click on water color sample:")
-    print("7. Click on water color (if visible in image)")
-    print("\nControls: 'r' to reset, 'q' to quit, 's' to skip color selection, 'w' to skip water color")
+    print("STEP 1: Outline the FULL visible scale (4 corner points):")
+    print("Click in order - even if parts are underwater!")
+    print("1. Top-left corner of visible scale")
+    print("2. Top-right corner of visible scale") 
+    print("3. Bottom-left corner of visible scale")
+    print("4. Bottom-right corner of visible scale")
+    print("\nSTEP 2: Mark the waterline on the scale:")
+    print("5. Click on LEFT edge of scale at waterline")
+    print("6. Click on RIGHT edge of scale at waterline")
+    print("\nSTEP 3: After waterline, click on color samples (optional):")
+    print("7. Scale background color (press 's' to skip)")
+    print("8. Scale markings color") 
+    print("9. Water color (press 'w' to skip)")
+    print("\nControls: 'r' to reset, 'q' to quit, 's' to skip colors, 'w' to skip water")
     
     # Create a copy for drawing
     display_image = image.copy()
-    points = []
+    scale_corners = []  # 4 corner points of scale
+    waterline_points = []  # 2 points marking waterline on scale
     color_samples = []
     water_samples = []
-    point_labels = ["Top-Left", "Top-Right", "Bottom-Left", "Bottom-Right", "Scale Background", "Scale Markings", "Water Color"]
-    colors = [(0, 255, 0), (0, 255, 255), (255, 0, 0), (255, 0, 255), (255, 255, 0), (0, 128, 255), (128, 255, 128)]
+    
+    # Labels and colors for visualization
+    corner_labels = ["Top-Left Scale", "Top-Right Scale", "Bottom-Left Scale", "Bottom-Right Scale"]
+    waterline_labels = ["Waterline Left", "Waterline Right"]
+    color_labels = ["Scale Background", "Scale Markings", "Water Color"]
+    
+    corner_colors = [(0, 255, 0), (0, 255, 255), (255, 0, 0), (255, 0, 255)]  # Green, Cyan, Red, Magenta
+    waterline_colors = [(255, 255, 0), (0, 128, 255)]  # Yellow, Orange
+    color_colors = [(128, 255, 128), (255, 128, 128), (128, 128, 255)]
     
     # State tracking
     picking_corners = True
+    picking_waterline = False
     picking_colors = False
-    picking_water = False
     
     def mouse_callback(event, x, y, flags, param):
-        nonlocal points, color_samples, water_samples, display_image, picking_corners, picking_colors, picking_water
+        nonlocal scale_corners, waterline_points, color_samples, water_samples, display_image
+        nonlocal picking_corners, picking_waterline, picking_colors
         
         if event == cv2.EVENT_LBUTTONDOWN:
-            if picking_corners and len(points) < 4:
-                # Handle corner point selection
-                points.append((x, y))
-                color = colors[len(points)-1]
-                cv2.circle(display_image, (x, y), 5, color, -1)
-                cv2.putText(display_image, f"{len(points)}: {point_labels[len(points)-1]}", 
-                           (x+10, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-                print(f"Point {len(points)}: {point_labels[len(points)-1]} at ({x}, {y})")
-                cv2.imshow('Scale Analysis', display_image)
+            if picking_corners and len(scale_corners) < 4:
+                # Handle scale corner selection
+                scale_corners.append((x, y))
+                color = corner_colors[len(scale_corners)-1]
+                cv2.circle(display_image, (x, y), 8, color, -1)
+                label = corner_labels[len(scale_corners)-1]
+                cv2.putText(display_image, f"{len(scale_corners)}.{label}", (x+10, y-10), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
                 
-                if len(points) == 4:
-                    analyze_picked_points(points, image.shape)
-                    print("\n" + "="*60)
-                    print("STEP 2: COLOR SELECTION")
-                    print("="*60)
-                    print("Now click on representative colors:")
-                    print("- Click on the BACKGROUND color of your scale")
-                    print("- Then click on the MARKING/TEXT color")
-                    print("- Press 's' to skip color selection")
+                if len(scale_corners) == 4:
+                    # Draw scale outline
+                    pts = np.array(scale_corners, np.int32)
+                    cv2.polylines(display_image, [pts], True, (0, 255, 0), 2)
                     picking_corners = False
+                    picking_waterline = True
+                    print(f"\n✓ Scale corners marked. Now click on waterline (left and right edges of scale)")
+                    
+            elif picking_waterline and len(waterline_points) < 2:
+                # Handle waterline point selection
+                waterline_points.append((x, y))
+                color = waterline_colors[len(waterline_points)-1]
+                cv2.circle(display_image, (x, y), 8, color, -1)
+                label = waterline_labels[len(waterline_points)-1]
+                cv2.putText(display_image, f"{len(waterline_points)+4}.{label}", (x+10, y-10), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+                
+                if len(waterline_points) == 2:
+                    # Draw waterline
+                    cv2.line(display_image, waterline_points[0], waterline_points[1], (255, 255, 0), 3)
+                    picking_waterline = False
                     picking_colors = True
-            
+                    print(f"\n✓ Waterline marked. Now click on scale colors (or press 's' to skip)")
+                    
             elif picking_colors and len(color_samples) < 2:
                 # Handle color sample selection
-                sample_idx = len(color_samples) + 4  # Offset by 4 corner points
+                sample_idx = len(color_samples)
                 color_samples.append((x, y))
-                color = colors[sample_idx]
+                color = color_colors[sample_idx]
                 
                 # Sample the color at clicked location
                 clicked_bgr = image[y, x]
@@ -96,8 +118,8 @@ def interactive_coordinate_picker(image, image_path):
                 # Draw sample point
                 cv2.circle(display_image, (x, y), 8, color, -1)
                 cv2.circle(display_image, (x, y), 10, (255, 255, 255), 2)
-                cv2.putText(display_image, f"{sample_idx+1}: {point_labels[sample_idx]}", 
-                           (x+15, y-15), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                cv2.putText(display_image, f"{sample_idx+7}.{color_labels[sample_idx]}", 
+                           (x+15, y-15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
                 
                 # Show color info
                 sample_type = "Background" if len(color_samples) == 1 else "Markings"
@@ -198,7 +220,16 @@ def interactive_coordinate_picker(image, image_path):
             print("="*60)
     
     cv2.destroyAllWindows()
-    return points, color_samples, water_samples
+    
+    # Return the enhanced data structure
+    result_data = {
+        'scale_corners': scale_corners,
+        'waterline_points': waterline_points, 
+        'color_samples': color_samples,
+        'water_samples': water_samples
+    }
+    
+    return result_data
 
 def analyze_picked_points(points, image_shape):
     """Analyze the manually picked points"""
@@ -564,59 +595,138 @@ def generate_config_suggestions(image, manual_points=None, color_sample_data=Non
         water_color_name = determine_color_name(water_sample_data['mean_hsv'])
         print(f"- Water color: {water_color_name.capitalize()}")
 
-def generate_calibration_data(image, manual_points, config_height_cm=None):
-    """Generate calibration.yaml data from analyzed scale points"""
-    if len(manual_points) != 4:
+def get_scale_measurements():
+    """Get scale measurement inputs from user"""
+    print("\n" + "="*60)
+    print("SCALE MEASUREMENT INPUT")
+    print("="*60)
+    print("Enter the scale readings to calculate accurate cm/pixel ratio:")
+    
+    try:
+        top_measurement = float(input("Enter scale measurement at TOP of outlined scale (cm): "))
+        waterline_measurement = float(input("Enter scale measurement at WATERLINE position (cm): "))
+        
+        if top_measurement <= waterline_measurement:
+            print("Warning: Top measurement should be higher than waterline measurement")
+            print("(assuming scale increases going up)")
+            
+        print(f"\nMeasurement difference: {abs(top_measurement - waterline_measurement):.2f} cm")
+        return top_measurement, waterline_measurement
+        
+    except (ValueError, EOFError):
+        print("Invalid input - using default measurements")
+        return None, None
+
+def generate_calibration_data_enhanced(image, result_data, top_measurement=None, waterline_measurement=None):
+    """Generate enhanced calibration.yaml data from scale analysis"""
+    scale_corners = result_data['scale_corners']
+    waterline_points = result_data['waterline_points']
+    
+    if len(scale_corners) != 4:
         print("Cannot generate calibration data: Need exactly 4 corner points")
         return None
     
-    # Calculate scale dimensions from manual points
-    x_coords = [p[0] for p in manual_points]
-    y_coords = [p[1] for p in manual_points]
+    if len(waterline_points) != 2:
+        print("Cannot generate calibration data: Need exactly 2 waterline points")
+        return None
     
-    scale_height_pixels = max(y_coords) - min(y_coords)
+    # Calculate pixel distances
+    scale_x_coords = [p[0] for p in scale_corners]
+    scale_y_coords = [p[1] for p in scale_corners]
     
-    # Use provided height or prompt user
-    if config_height_cm:
-        scale_height_cm = config_height_cm
-        print(f"\nUsing configured scale height: {scale_height_cm}cm")
+    # Find top and bottom of scale
+    scale_top_y = min(scale_y_coords)
+    scale_bottom_y = max(scale_y_coords)
+    
+    # Calculate waterline Y position (average of two waterline points)
+    waterline_y = (waterline_points[0][1] + waterline_points[1][1]) / 2
+    
+    # Get measurements from user if not provided
+    if top_measurement is None or waterline_measurement is None:
+        top_measurement, waterline_measurement = get_scale_measurements()
+        if top_measurement is None or waterline_measurement is None:
+            print("Cannot calculate calibration without valid measurements")
+            return None
+    
+    # Calculate pixel distance from top of scale to waterline
+    pixel_distance_top_to_waterline = abs(waterline_y - scale_top_y)
+    
+    # Calculate cm distance from measurements
+    cm_distance_top_to_waterline = abs(top_measurement - waterline_measurement)
+    
+    # Calculate pixels per cm from this measurement
+    if cm_distance_top_to_waterline > 0:
+        pixels_per_cm = pixel_distance_top_to_waterline / cm_distance_top_to_waterline
     else:
-        print(f"\nCalculated scale height: {scale_height_pixels} pixels")
-        try:
-            scale_height_cm = float(input("Enter the actual scale height in cm: "))
-        except (ValueError, EOFError):
-            print("Invalid input - using default 100cm")
-            scale_height_cm = 100.0
+        print("Error: No measurement difference - cannot calculate calibration")
+        return None
     
-    # Calculate pixels per cm
-    pixels_per_cm = scale_height_pixels / scale_height_cm
+    print(f"\nEnhanced Calibration Calculations:")
+    print(f"- Top of scale position: Y={scale_top_y}")
+    print(f"- Waterline position: Y={waterline_y:.1f}")
+    print(f"- Pixel distance (top to waterline): {pixel_distance_top_to_waterline:.1f} pixels")
+    print(f"- Measurement at top: {top_measurement} cm")
+    print(f"- Measurement at waterline: {waterline_measurement} cm")
+    print(f"- Real distance (top to waterline): {cm_distance_top_to_waterline} cm")
+    print(f"- Calculated pixels per cm: {pixels_per_cm:.3f}")
+    print(f"- Current water level: {waterline_measurement} cm")
     
-    print(f"\nCalibration calculations:")
-    print(f"- Scale height in pixels: {scale_height_pixels}")
-    print(f"- Scale height in cm: {scale_height_cm}")
-    print(f"- Pixels per cm: {pixels_per_cm:.2f}")
-    
-    # Generate calibration data
+    # Generate enhanced calibration data
     from datetime import datetime
     
+    # Get image dimensions
+    img_height, img_width = image.shape[:2]
+    
+    # Calculate scale boundaries
+    x_min, x_max = min(scale_x_coords), max(scale_x_coords)
+    y_min, y_max = min(scale_y_coords), max(scale_y_coords)
+    
     calib_data = {
-        'pixels_per_cm': float(round(pixels_per_cm, 2)),
+        'pixels_per_cm': float(round(pixels_per_cm, 3)),
         'image_path': 'data/calibration/calibration_image.jpg',
-        'scale_height_cm': float(scale_height_cm),
         'calibration_date': datetime.now().isoformat(),
+        'image_dimensions': {
+            'width': img_width,
+            'height': img_height,
+            'resized': False  # analyze_scale_photo works with original images
+        },
+        'scale_measurements': {
+            'top_measurement_cm': float(top_measurement),
+            'waterline_measurement_cm': float(waterline_measurement),
+            'measurement_difference_cm': float(cm_distance_top_to_waterline),
+            'current_water_level_cm': float(waterline_measurement)
+        },
         'reference_points': {
             'top_of_scale': {
-                'x': int(min(x_coords)),
-                'y': int(min(y_coords))
+                'x': int(x_min),
+                'y': int(scale_top_y)
             },
             'bottom_of_scale': {
-                'x': int(max(x_coords)), 
-                'y': int(max(y_coords))
+                'x': int(x_max), 
+                'y': int(scale_bottom_y)
+            },
+            'waterline': {
+                'x_left': int(waterline_points[0][0]),
+                'y_left': int(waterline_points[0][1]),
+                'x_right': int(waterline_points[1][0]),
+                'y_right': int(waterline_points[1][1]),
+                'y_average': int(waterline_y)
             }
         },
-        'calibration_method': 'interactive_analysis',
-        'confidence': 0.95,
-        'notes': 'Generated by analyze_scale_photo.py interactive analysis tool'
+        'scale_boundaries': {
+            'x_min': int(x_min),
+            'x_max': int(x_max),
+            'y_min': int(y_min),
+            'y_max': int(y_max),
+            # Add percentage coordinates for config compatibility
+            'x_min_pct': round(x_min / img_width, 3),
+            'x_max_pct': round(x_max / img_width, 3),
+            'y_min_pct': round(y_min / img_height, 3),
+            'y_max_pct': round(y_max / img_height, 3)
+        },
+        'calibration_method': 'enhanced_interactive_waterline',
+        'confidence': 0.98,
+        'notes': f'Generated by enhanced analyze_scale_photo.py with waterline detection on {img_width}x{img_height} image'
     }
     
     return calib_data
@@ -702,14 +812,23 @@ def main():
     if image is None:
         return
     
-    # 2. Interactive coordinate and color picker
-    print(f"\nStarting interactive analysis...")
-    manual_points, color_samples, water_samples = interactive_coordinate_picker(image, image_path)
+    # 2. Enhanced interactive coordinate and color picker
+    print(f"\nStarting enhanced interactive analysis...")
+    result_data = interactive_coordinate_picker(image, image_path)
+    
+    # Check if we have the required data
+    if len(result_data['scale_corners']) != 4:
+        print("Error: Need exactly 4 scale corner points")
+        return
+        
+    if len(result_data['waterline_points']) != 2:
+        print("Error: Need exactly 2 waterline points")
+        return
     
     # Analyze color samples if provided
     color_sample_data = None
-    if len(color_samples) == 2:
-        color_sample_data = analyze_color_samples(image, manual_points, color_samples)
+    if len(result_data['color_samples']) == 2:
+        color_sample_data = analyze_color_samples(image, result_data['scale_corners'], result_data['color_samples'])
     
     # Analyze water sample if provided
     water_sample_data = None

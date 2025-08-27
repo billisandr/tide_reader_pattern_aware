@@ -6,8 +6,8 @@ scale:
   width: 8.0
   # Scale position in image (if fixed)
   expected_position:
-    x_min: 85
-    x_max: 193
+    x_min: 81
+    x_max: 198
     y_min: 0
     y_max: 605
   
@@ -89,7 +89,7 @@ detection:
 
 processing:
   # Image processing settings
-  resize_width: 800  # Resize images for faster processing
+  resize_width: null  # 800 # Use "null" to disable resizing & use original image dimensions
   save_processed_images: true
   image_format: 'jpg'
   
