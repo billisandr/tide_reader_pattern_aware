@@ -6,9 +6,9 @@ scale:
   width: 8.0
   # Scale position in image (if fixed)
   expected_position:
-    x_min: 75
-    x_max: 190
-    y_min: 1
+    x_min: 85
+    x_max: 193
+    y_min: 0
     y_max: 605
   
   # RGB/HSV color-based scale detection
@@ -39,8 +39,8 @@ scale:
 
       black:
         enabled: true
-        hsv_lower: [107, 0, 0]
-        hsv_upper: [131, 79, 85]
+        hsv_lower: [0, 0, 0]
+        hsv_upper: [179, 62, 88]
         description: "Black scale markings"
       
       red:
@@ -71,7 +71,7 @@ calibration:
   # Pixels per centimeter (will be calculated during calibration)
   pixels_per_cm: null
   # Reference water level for calibration (cm)
-  reference_water_level: 150.0
+  reference_water_level: 232.0
 
 detection:
   # Water line detection parameters
@@ -81,11 +81,11 @@ detection:
   min_contour_area: 500
   
   # Water detection method: 'edge', 'color', 'gradient'
-  method: 'edge'
+  method: 'gradient'
   
   # Color-based detection (HSV ranges for water)
-  water_hsv_lower: [83, 20, 101]
-  water_hsv_upper: [113, 140, 221]
+  water_hsv_lower: [75, 11, 87]
+  water_hsv_upper: [105, 131, 207]
 
 processing:
   # Image processing settings
