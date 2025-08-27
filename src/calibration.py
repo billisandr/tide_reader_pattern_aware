@@ -29,6 +29,33 @@ class CalibrationManager:
         
         return calib_data['pixels_per_cm']
     
+    def get_enhanced_calibration_data(self):
+        """Load enhanced calibration data including waterline reference."""
+        if not self.is_calibrated():
+            return None
+        
+        with open(self.calibration_file, 'r') as f:
+            calib_data = yaml.safe_load(f)
+        
+        # Extract enhanced data if available
+        enhanced_data = {
+            'pixels_per_cm': calib_data['pixels_per_cm'],
+            'method': calib_data.get('calibration_method', 'unknown'),
+            'confidence': calib_data.get('confidence', 0.95),
+            'waterline_reference': None,
+            'scale_measurements': None
+        }
+        
+        # Check if this is enhanced waterline-aware calibration
+        if calib_data.get('calibration_method') == 'enhanced_interactive_waterline':
+            enhanced_data['waterline_reference'] = calib_data.get('reference_points', {}).get('waterline')
+            enhanced_data['scale_measurements'] = calib_data.get('scale_measurements')
+            self.logger.info("Using enhanced waterline-aware calibration data")
+        else:
+            self.logger.info("Using standard calibration data (no waterline reference)")
+        
+        return enhanced_data
+    
     def run_calibration(self):
         """
         Run interactive calibration process.

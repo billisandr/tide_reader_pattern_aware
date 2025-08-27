@@ -214,7 +214,9 @@ detection:
 
 processing:
   # Image processing settings
-  resize_width: 800  # Resize images for faster processing
+  resize_width: null  # ⚠️ WARNING: Set to null to disable resizing (recommended)
+                      # If enabled (e.g., 800), scale coordinates may become incorrect
+                      # Use enhanced calibration workflow to avoid coordinate mismatch
   save_processed_images: true
   image_format: 'jpg'
   
@@ -772,9 +774,11 @@ The project follows standard Python conventions:
 **🆕 Scale detection completely missing/wrong:**
 
 - **Most likely cause**: Image resizing mismatch with hardcoded coordinates
-- **Solution**: Disable resizing in config.yaml: `resize_width: null`
-- **Better solution**: Use enhanced calibration with percentage coordinates
-- **Temporary fix**: Run `python src/calibration/analyze_scale_photo.py` to get correct coordinates
+- **Immediate solution**: Disable resizing in config.yaml: `resize_width: null`
+- **Root cause**: When resizing is enabled, hardcoded scale coordinates become incorrect
+- **⚠️ Important**: Current system uses absolute pixel coordinates that don't scale properly
+- **Best practice**: Always disable resizing (`resize_width: null`) until relative coordinate system is implemented
+- **Workaround**: Run `python src/calibration/analyze_scale_photo.py` to get correct coordinates for your setup
 
 **🆕 Waterline detection inaccurate:**
 

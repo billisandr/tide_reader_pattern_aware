@@ -94,11 +94,15 @@ def main():
         logger.error("System not calibrated. Run with CALIBRATION_MODE=true first.")
         sys.exit(1)
     
-    pixels_per_cm = calibration_manager.get_pixels_per_cm()
-    logger.info(f"Using calibration: {pixels_per_cm:.2f} pixels/cm")
+    # Load enhanced calibration data
+    enhanced_calibration_data = calibration_manager.get_enhanced_calibration_data()
+    pixels_per_cm = enhanced_calibration_data['pixels_per_cm']
     
-    # Initialize detector
-    detector = WaterLevelDetector(config, pixels_per_cm)
+    logger.info(f"Using calibration: {pixels_per_cm:.2f} pixels/cm")
+    logger.info(f"Calibration method: {enhanced_calibration_data['method']}")
+    
+    # Initialize detector with enhanced calibration data
+    detector = WaterLevelDetector(config, pixels_per_cm, enhanced_calibration_data)
     
     # Processing loop  
     process_interval = int(os.environ.get('PROCESS_INTERVAL', 60))

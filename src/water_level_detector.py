@@ -15,11 +15,21 @@ import time
 from debug_visualizer import DebugVisualizer
 
 class WaterLevelDetector:
-    def __init__(self, config, pixels_per_cm):
+    def __init__(self, config, pixels_per_cm, enhanced_calibration_data=None):
         """Initialize the water level detector."""
         self.config = config
         self.pixels_per_cm = pixels_per_cm
+        self.enhanced_calibration_data = enhanced_calibration_data
         self.logger = logging.getLogger(__name__)
+        
+        # Log calibration method being used
+        if enhanced_calibration_data and enhanced_calibration_data.get('method') == 'enhanced_interactive_waterline':
+            self.logger.info(f"Using enhanced waterline-aware calibration (confidence: {enhanced_calibration_data.get('confidence', 'unknown')})")
+            if enhanced_calibration_data.get('waterline_reference'):
+                waterline_ref = enhanced_calibration_data['waterline_reference']
+                self.logger.info(f"Waterline reference at Y={waterline_ref.get('y_average', 'unknown')}")
+        else:
+            self.logger.info("Using standard calibration method")
         
         # Detection parameters
         self.edge_low = config['detection']['edge_threshold_low']
@@ -58,19 +68,63 @@ class WaterLevelDetector:
     def detect_water_line(self, image):
         """
         Detect the water line in the image using the configured detection method.
+        Enhanced with waterline reference if available.
         Returns y-coordinate of water line.
         """
         # Log which detection method is being used
         self.logger.debug(f"Using detection method: {self.detection_method}")
         
-        # Route to appropriate detection method
+        # Route to appropriate detection method with waterline enhancement
         if self.detection_method == 'color':
-            return self.detect_water_line_color(image)
+            water_y = self.detect_water_line_color(image)
         elif self.detection_method == 'gradient':
             gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            return self.detect_water_line_gradient(gray)
+            water_y = self.detect_water_line_gradient(gray)
         else:  # default to 'edge' method
-            return self.detect_water_line_edge(image)
+            water_y = self.detect_water_line_edge(image)
+        
+        # Apply waterline reference enhancement if available
+        if self.enhanced_calibration_data and self.enhanced_calibration_data.get('waterline_reference'):
+            water_y = self.enhance_water_detection_with_reference(water_y, image)
+        
+        return water_y
+    
+    def enhance_water_detection_with_reference(self, detected_water_y, image):
+        """
+        Enhance water detection using waterline reference from calibration.
+        """
+        waterline_ref = self.enhanced_calibration_data['waterline_reference']
+        scale_measurements = self.enhanced_calibration_data.get('scale_measurements')
+        
+        if not waterline_ref or not scale_measurements:
+            self.logger.debug("Insufficient waterline reference data, using standard detection")
+            return detected_water_y
+        
+        ref_y = waterline_ref.get('y_average')
+        ref_water_level = scale_measurements.get('current_water_level_cm')
+        
+        if ref_y is None or ref_water_level is None:
+            self.logger.debug("Missing waterline reference coordinates, using standard detection")
+            return detected_water_y
+        
+        # Calculate expected water line position based on reference
+        # If no detection was made, use reference as fallback
+        if detected_water_y is None:
+            self.logger.info(f"No water line detected, using calibration reference at Y={ref_y}")
+            return ref_y
+        
+        # Validate detection against reference (within reasonable range)
+        pixel_difference = abs(detected_water_y - ref_y)
+        cm_difference = pixel_difference / self.pixels_per_cm
+        
+        # If detected water line is very far from reference, log a warning
+        if cm_difference > 50:  # More than 50cm difference
+            self.logger.warning(f"Detected water line (Y={detected_water_y}) differs significantly from reference (Y={ref_y}) by {cm_difference:.1f}cm")
+            # Could implement fallback logic here if needed
+        else:
+            self.logger.debug(f"Water detection validated against reference: {cm_difference:.1f}cm difference")
+        
+        return detected_water_y
     
     def detect_water_line_edge(self, image):
         """
