@@ -72,6 +72,9 @@ calibration:
   pixels_per_cm: null
   # Reference water level for calibration (cm)
   reference_water_level: 235.0
+  # Use enhanced calibration data with waterline gradient analysis
+  use_enhanced_data: true
+  enhanced_data_path: 'data/calibration/calibration.yaml'
 
 detection:
   # Water line detection parameters
@@ -81,7 +84,7 @@ detection:
   min_contour_area: 500
   
   # Water detection method: 'edge', 'color', 'gradient'
-  method: 'edge'
+  method: 'gradient'
   
   # Color-based detection (HSV ranges for water)
   water_hsv_lower: [75, 11, 87]

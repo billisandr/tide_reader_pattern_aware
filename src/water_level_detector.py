@@ -713,7 +713,8 @@ class WaterLevelDetector:
 
     def detect_water_line_gradient_enhanced(self, scale_region):
         """
-        Use enhanced calibration gradient data to detect waterline.
+        Use enhanced calibration gradient data to detect waterline with improved sensitivity.
+        Optimized for clear water that darkens the scale background.
         Returns local Y coordinate within the region.
         """
         gradient_data = self.enhanced_calibration_data.get('waterline_gradient')
@@ -724,39 +725,109 @@ class WaterLevelDetector:
         hsv = cv2.cvtColor(scale_region, cv2.COLOR_BGR2HSV)
         gray = cv2.cvtColor(scale_region, cv2.COLOR_BGR2GRAY)
         
-        # Try to use above/below water color ranges
+        # Enhanced brightness-based detection for clear water darkening
+        if 'above_water' in gradient_data and 'below_water' in gradient_data:
+            above_stats = gradient_data['above_water']
+            below_stats = gradient_data['below_water']
+            
+            # Calculate expected brightness difference (V channel is most important)
+            above_brightness = above_stats['hsv_mean'][2]  # V channel
+            below_brightness = below_stats['hsv_mean'][2]  # V channel
+            expected_darkening_ratio = (above_brightness - below_brightness) / above_brightness
+            
+            # Use grayscale for more stable brightness detection
+            above_gray = above_stats['gray_mean']
+            below_gray = below_stats['gray_mean']
+            gray_darkening_ratio = (above_gray - below_gray) / above_gray
+            
+            self.logger.debug(f"Expected darkening - HSV: {expected_darkening_ratio:.3f}, Gray: {gray_darkening_ratio:.3f}")
+            
+            # Scan with improved sensitivity - look for gradual brightness transition
+            best_y = None
+            best_score = 0.0
+            
+            for y in range(5, scale_region.shape[0] - 5):
+                # Analyze 5-pixel window for stability
+                window_above = gray[max(0, y-5):y, :]
+                window_below = gray[y:min(scale_region.shape[0], y+5), :]
+                
+                if window_above.size > 0 and window_below.size > 0:
+                    avg_above = np.mean(window_above)
+                    avg_below = np.mean(window_below)
+                    
+                    # Calculate observed darkening
+                    if avg_above > 0:
+                        observed_darkening = (avg_above - avg_below) / avg_above
+                        
+                        # Score based on how well it matches expected darkening
+                        # Allow ±50% tolerance for lighting variations
+                        expected_min = gray_darkening_ratio * 0.5
+                        expected_max = gray_darkening_ratio * 1.5
+                        
+                        if expected_min <= observed_darkening <= expected_max:
+                            # Additional scoring factors
+                            brightness_score = 1.0 - abs(observed_darkening - gray_darkening_ratio) / gray_darkening_ratio
+                            continuity_score = min(window_above.shape[1] / scale_region.shape[1], 1.0)  # Width coverage
+                            
+                            total_score = brightness_score * continuity_score
+                            
+                            if total_score > best_score:
+                                best_score = total_score
+                                best_y = y
+                                
+                                self.logger.debug(f"Y={y}: observed_darkening={observed_darkening:.3f}, score={total_score:.3f}")
+            
+            if best_y is not None and best_score > 0.3:  # Minimum confidence threshold
+                self.logger.debug(f"Enhanced gradient detection: Y={best_y}, score={best_score:.3f}")
+                return best_y
+        
+        # Try HSV-based detection with widened tolerance for subtle color shifts
         if 'detection_ranges' in gradient_data:
             ranges = gradient_data['detection_ranges']
             
-            # Create masks for above and below water regions
-            above_water_mask = cv2.inRange(hsv, 
-                                         np.array(ranges['above_water_hsv']['lower']), 
-                                         np.array(ranges['above_water_hsv']['upper']))
+            # Widen HSV ranges by 50% to catch subtle variations
+            above_lower = np.array(ranges['above_water_hsv']['lower'])
+            above_upper = np.array(ranges['above_water_hsv']['upper'])
+            below_lower = np.array(ranges['below_water_hsv']['lower'])
+            below_upper = np.array(ranges['below_water_hsv']['upper'])
             
-            below_water_mask = cv2.inRange(hsv,
-                                         np.array(ranges['below_water_hsv']['lower']),
-                                         np.array(ranges['below_water_hsv']['upper']))
+            # Expand tolerance ranges (Hue ±15, Saturation ±30, Value ±40)
+            h_tolerance, s_tolerance, v_tolerance = 15, 30, 40
             
-            # Find transition between the two regions
+            above_lower = np.maximum([0, 0, 0], above_lower - [h_tolerance, s_tolerance, v_tolerance])
+            above_upper = np.minimum([179, 255, 255], above_upper + [h_tolerance, s_tolerance, v_tolerance])
+            below_lower = np.maximum([0, 0, 0], below_lower - [h_tolerance, s_tolerance, v_tolerance])
+            below_upper = np.minimum([179, 255, 255], below_upper + [h_tolerance, s_tolerance, v_tolerance])
+            
+            # Create masks with expanded ranges
+            above_water_mask = cv2.inRange(hsv, above_lower, above_upper)
+            below_water_mask = cv2.inRange(hsv, below_lower, below_upper)
+            
+            # Find transition with lower threshold (20% instead of 30%)
             for y in range(scale_region.shape[0] - 1):
                 above_pixels = np.sum(above_water_mask[y, :] > 0)
                 below_pixels = np.sum(below_water_mask[y + 1, :] > 0)
                 
-                # If we find a transition from above-water to below-water colors
-                if above_pixels > scale_region.shape[1] * 0.3 and below_pixels > scale_region.shape[1] * 0.3:
+                # More sensitive threshold for subtle color changes
+                width_threshold = scale_region.shape[1] * 0.2  # Reduced from 0.3 to 0.2
+                if above_pixels > width_threshold and below_pixels > width_threshold:
+                    self.logger.debug(f"HSV transition detection: Y={y}, above={above_pixels}, below={below_pixels}")
                     return y
         
-        # Fallback: use the difference in grayscale values
+        # Final fallback: basic grayscale threshold with improved sensitivity
         if 'above_water' in gradient_data and 'below_water' in gradient_data:
             above_mean = gradient_data['above_water']['gray_mean']
             below_mean = gradient_data['below_water']['gray_mean']
-            threshold_gray = (above_mean + below_mean) / 2
             
-            # Find the transition point
-            for y in range(scale_region.shape[0]):
-                row_mean = np.mean(gray[y, :])
-                if (above_mean > below_mean and row_mean < threshold_gray) or \
-                   (above_mean < below_mean and row_mean > threshold_gray):
+            # Use weighted threshold closer to above-water value for clear water
+            threshold_gray = above_mean * 0.7 + below_mean * 0.3  # Favor above-water characteristics
+            
+            # Find the transition point with smoothing
+            for y in range(2, scale_region.shape[0] - 2):
+                # Use 3-row average for stability
+                row_mean = np.mean(gray[y-1:y+2, :])
+                if (above_mean > below_mean and row_mean < threshold_gray):
+                    self.logger.debug(f"Grayscale fallback detection: Y={y}, threshold={threshold_gray:.1f}")
                     return y
         
         return None
@@ -924,35 +995,109 @@ class WaterLevelDetector:
         return 0.0
 
     def calculate_enhanced_detection_confidence(self, scale_region, y_position):
-        """Calculate confidence score for enhanced gradient detection result"""
+        """Calculate confidence score for enhanced gradient detection result - optimized for clear water"""
         gradient_data = self.enhanced_calibration_data.get('waterline_gradient')
         if not gradient_data:
             return 0.0
         
-        # High confidence for enhanced method if it uses calibrated data
-        base_confidence = 0.8  # Enhanced method gets higher base confidence
+        # Higher base confidence for enhanced method with calibrated data
+        base_confidence = 0.9  # Increased from 0.8 to prioritize enhanced method
         
-        # Validate against expected color differences
-        if 'differences' in gradient_data:
-            gray = cv2.cvtColor(scale_region, cv2.COLOR_BGR2GRAY)
-            if 0 <= y_position < gray.shape[0]:
-                # Check if observed gradient matches expected
-                expected_diff = gradient_data['differences']['gray_diff']
+        gray = cv2.cvtColor(scale_region, cv2.COLOR_BGR2GRAY)
+        hsv = cv2.cvtColor(scale_region, cv2.COLOR_BGR2HSV)
+        
+        if not (0 <= y_position < gray.shape[0]):
+            return 0.0
+        
+        confidence_factors = []
+        
+        # Factor 1: Grayscale brightness matching (most important for clear water)
+        if 'above_water' in gradient_data and 'below_water' in gradient_data:
+            expected_above = gradient_data['above_water']['gray_mean']
+            expected_below = gradient_data['below_water']['gray_mean']
+            expected_darkening = (expected_above - expected_below) / expected_above
+            
+            # Analyze 5-pixel window around detection point
+            window_size = 5
+            above_region = max(0, y_position - window_size)
+            below_region = min(gray.shape[0], y_position + window_size)
+            
+            if above_region < y_position < below_region:
+                observed_above = np.mean(gray[above_region:y_position, :])
+                observed_below = np.mean(gray[y_position:below_region, :])
                 
-                above_region = max(0, y_position - 10)
-                below_region = min(gray.shape[0], y_position + 10)
-                
-                if above_region < y_position < below_region:
-                    above_mean = np.mean(gray[above_region:y_position, :])
-                    below_mean = np.mean(gray[y_position:below_region, :])
-                    observed_diff = abs(above_mean - below_mean)
+                if observed_above > 0:
+                    observed_darkening = (observed_above - observed_below) / observed_above
                     
-                    # Compare with expected difference
-                    if expected_diff > 0:
-                        similarity = 1.0 - min(abs(observed_diff - expected_diff) / expected_diff, 1.0)
-                        return base_confidence * similarity
+                    # Score how well the darkening ratio matches expectation
+                    darkening_similarity = 1.0 - min(abs(observed_darkening - expected_darkening) / max(expected_darkening, 0.1), 1.0)
+                    confidence_factors.append(('darkening_match', darkening_similarity, 0.4))  # 40% weight
+                    
+                    # Bonus for appropriate brightness levels
+                    brightness_score = 1.0
+                    if abs(observed_above - expected_above) / expected_above < 0.3:  # Within 30%
+                        brightness_score = 1.2
+                    confidence_factors.append(('brightness_level', brightness_score, 0.2))  # 20% weight
         
-        return base_confidence
+        # Factor 2: HSV Value channel consistency
+        if 'above_water' in gradient_data:
+            expected_hsv_above = gradient_data['above_water']['hsv_mean'][2]  # V channel
+            expected_hsv_below = gradient_data['below_water']['hsv_mean'][2]  # V channel
+            
+            window_above = hsv[max(0, y_position-3):y_position, :, 2]  # V channel only
+            window_below = hsv[y_position:min(hsv.shape[0], y_position+3), :, 2]
+            
+            if window_above.size > 0 and window_below.size > 0:
+                observed_v_above = np.mean(window_above)
+                observed_v_below = np.mean(window_below)
+                
+                v_above_match = 1.0 - min(abs(observed_v_above - expected_hsv_above) / expected_hsv_above, 1.0)
+                v_below_match = 1.0 - min(abs(observed_v_below - expected_hsv_below) / expected_hsv_below, 1.0)
+                
+                hsv_consistency = (v_above_match + v_below_match) / 2
+                confidence_factors.append(('hsv_consistency', hsv_consistency, 0.25))  # 25% weight
+        
+        # Factor 3: Spatial continuity across waterline width
+        if y_position < gray.shape[0]:
+            row_above = gray[max(0, y_position-2):y_position, :]
+            row_below = gray[y_position:min(gray.shape[0], y_position+2), :]
+            
+            if row_above.size > 0 and row_below.size > 0:
+                # Check consistency across width
+                width_consistency = 0.0
+                width_samples = min(10, gray.shape[1] // 2)  # Sample every few columns
+                
+                for x in range(0, gray.shape[1], max(1, gray.shape[1] // width_samples)):
+                    if x < row_above.shape[1] and x < row_below.shape[1]:
+                        local_above = np.mean(row_above[:, x])
+                        local_below = np.mean(row_below[:, x])
+                        if local_above > local_below:  # Expect darkening
+                            width_consistency += 1.0
+                
+                width_consistency /= width_samples
+                confidence_factors.append(('width_consistency', width_consistency, 0.15))  # 15% weight
+        
+        # Calculate weighted confidence score
+        if confidence_factors:
+            weighted_score = 0.0
+            total_weight = 0.0
+            
+            for factor_name, score, weight in confidence_factors:
+                weighted_score += score * weight
+                total_weight += weight
+                self.logger.debug(f"Enhanced confidence factor {factor_name}: {score:.3f} (weight: {weight})")
+            
+            if total_weight > 0:
+                final_confidence = base_confidence * (weighted_score / total_weight)
+                
+                # Bonus for having enhanced calibration data
+                if 'waterline_gradient' in self.enhanced_calibration_data:
+                    final_confidence = min(final_confidence * 1.1, 1.0)  # 10% bonus
+                
+                self.logger.debug(f"Enhanced detection confidence: {final_confidence:.3f} (base: {base_confidence}, weighted: {weighted_score/total_weight:.3f})")
+                return final_confidence
+        
+        return base_confidence * 0.5  # Fallback if factors couldn't be calculated
 
     def apply_consensus_analysis(self, detection_results):
         """Analyze consensus among detection methods"""
