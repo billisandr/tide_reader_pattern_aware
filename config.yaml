@@ -3,9 +3,7 @@ scale:
   # Known height of scale in cm
   total_height: 455.0
   # Width of scale in cm (for reference)
-  width: 8.0
-  # Fixed camera mode: prioritize expected_position over dynamic detection
-  fixed_camera_mode: true  # Set to false for dynamic scale detection
+  width: 5.0
   # Scale position in image (if fixed)
   expected_position:
     x_min: 81
