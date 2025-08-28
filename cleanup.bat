@@ -11,9 +11,9 @@ for %%d in (%directories%) do (
         echo Clearing contents of directory: %%d
         del /s /q "%%d\*" >nul 2>&1
         for /d %%x in ("%%d\*") do rmdir /s /q "%%x" >nul 2>&1
-        echo ✓ Cleared contents of %%d
+        echo Cleared contents of %%d
     ) else (
-        echo ⚠ Directory not found: %%d
+        echo Error: Directory not found: %%d
     )
 )
 

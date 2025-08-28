@@ -1,15 +1,17 @@
 # Camera and Scale Configuration
 scale:
   # Known height of scale in cm
-  total_height: 450.0
+  total_height: 455.0
   # Width of scale in cm (for reference)
   width: 8.0
+  # Fixed camera mode: prioritize expected_position over dynamic detection
+  fixed_camera_mode: true  # Set to false for dynamic scale detection
   # Scale position in image (if fixed)
   expected_position:
     x_min: 81
-    x_max: 198
-    y_min: 0
-    y_max: 605
+    x_max: 188
+    y_min: 1
+    y_max: 550
   
   # RGB/HSV color-based scale detection
   color_detection:
@@ -71,12 +73,12 @@ calibration:
   # Pixels per centimeter (will be calculated during calibration)
   pixels_per_cm: null
   # Reference water level for calibration (cm)
-  reference_water_level: 232.0
+  reference_water_level: 235.0
 
 detection:
   # Water line detection parameters
-  edge_threshold_low: 10
-  edge_threshold_high: 450
+  edge_threshold_low: 50
+  edge_threshold_high: 150
   blur_kernel_size: 7
   min_contour_area: 500
   
@@ -108,10 +110,18 @@ debug:
   annotation_thickness: 2
   font_scale: 0.7
   steps_to_save:
-    - 'original'
-    - 'preprocessed' 
-    - 'edges'
-    - 'contours'
-    - 'scale_detection'
-    - 'water_detection'
-    - 'final_result'
+      - 'original'
+      - 'preprocessed'
+      - 'color_mask_blue'           # NEW - see blue color detection
+      - 'color_mask_black'          # NEW - see black color detection  
+      - 'color_mask_combined'       # NEW - see combined color mask
+      - 'masked_grayscale'          # NEW - see color-filtered grayscale
+      - 'edges'
+      - 'scale_contours_analysis'   # NEW - see contour scoring
+      - 'scale_bounds_enhanced'     # NEW - see detected scale bounds
+      - 'scale_region_extracted'    # NEW - see extracted scale region
+      - 'contours'
+      - 'waterline_within_scale'    # NEW - see waterline detection
+      - 'scale_detection'
+      - 'water_detection'
+      - 'final_result'

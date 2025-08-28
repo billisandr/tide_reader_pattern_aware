@@ -68,7 +68,7 @@ pip install -r requirements.txt
 
 ```bash
 # Place calibration image in data/calibration/
-set CALIBRATION_MODE=true && python src/main.py
+set CALIBRATION_MODE=true & python src/main.py
 ```
 
 3. **Start processing:**
@@ -269,18 +269,19 @@ python src/calibration/analyze_scale_photo.py
 
 **🆕 Enhanced Analysis Workflow:**
 
-1. **Basic image analysis**: Shows dimensions and file info
-2. **🆕 Scale boundary selection**: Click 4 corner points of FULL visible scale (top-left, top-right, bottom-left, bottom-right)
+1. **Image display**: Shows calibration image window before requesting measurements
+2. **🆕 Scale measurement input**: Enter actual scale readings while viewing the image:
+   - Enter scale reading at TOP of visible scale (e.g., 485 cm)
+   - Enter scale reading at current WATERLINE position (e.g., 420 cm)
+3. **🆕 Scale boundary selection**: Click 4 corner points of FULL visible scale (top-left, top-right, bottom-left, bottom-right)
    - Select entire visible scale even if parts are underwater
-3. **🆕 Waterline marking**: Click 2 points on left and right edges of scale at waterline position
-4. **🆕 Scale measurement input**:
-   - Enter scale reading at TOP of outlined scale (e.g., 485 cm)
-   - Enter scale reading at WATERLINE position (e.g., 420 cm)
-   - System calculates precise pixels/cm from measurement difference
+4. **🆕 Waterline marking**: Click 2 points on left and right edges of scale at waterline position
 5. **Interactive color sampling** (optional): Click on scale background color, then on marking/text color
 6. **Interactive water sampling** (optional): Click on water color (if visible) for detection calibration
 7. **Automatic analysis**: Edge detection and color analysis
-8. **Enhanced config generation**: Provides ready-to-use config.yaml values plus accurate calibration data
+8. **🆕 Waterline gradient analysis**: Advanced analysis of color differences above/below waterline
+9. **Enhanced config generation**: Provides ready-to-use config.yaml values plus accurate calibration data
+10. **🆕 Summary display**: Clear summary of suggested config.yaml changes at the end
 
 **🆕 Key Advantages of Enhanced Workflow:**
 
@@ -316,7 +317,7 @@ python src/calibration/analyze_scale_photo.py
 # - Enhanced calibration.yaml is automatically generated with waterline data
 
 # Step 3: Run calibration (uses enhanced waterline-aware data)
-set CALIBRATION_MODE=true && python src/main.py
+set CALIBRATION_MODE=true & python src/main.py
 # → Loads enhanced calibration.yaml with waterline reference
 # → Uses actual measured cm/pixel ratio
 # → Ready for highly accurate water level detection
@@ -352,7 +353,7 @@ set CALIBRATION_MODE=true && python src/main.py
 # - Save image as: data/calibration/calibration_image.jpg
 
 # Step 3: Run direct calibration
-set CALIBRATION_MODE=true && python src/main.py
+set CALIBRATION_MODE=true & python src/main.py
 # → Uses config.yaml values to generate calibration.yaml
 # → Calculates pixels_per_cm from scale dimensions
 ```
@@ -365,6 +366,16 @@ set CALIBRATION_MODE=true && python src/main.py
 2. **Source Tracking**: File includes metadata about which method generated it
 3. **Consistent Format**: Same data structure regardless of generation method
 4. **Automatic Updates**: Each calibration run updates the file with current settings
+
+**Recent Improvements (Latest Version)**:
+
+- **Fixed YAML serialization errors**: Resolved numpy object serialization issues in calibration.yaml
+- **Improved image display timing**: Calibration image now shows before measurement input
+- **Enhanced waterline gradient analysis**: Fixed KeyError issues with gradient data structure
+- **Clean output messages**: Removed Unicode tick marks that caused display issues
+- **Windows command syntax**: Updated all command examples to use proper Windows syntax (`set VAR=value & command`)
+- **Better error handling**: Improved numpy type conversion for YAML compatibility
+- **Enhanced summary display**: Clear config.yaml suggestions shown at end of calibration process
 
 **🆕 Enhanced generated calibration.yaml contains**:
 
@@ -430,7 +441,7 @@ After either method, verify calibration accuracy:
 
 ```bash
 # Test with debug mode to see detection results
-set DEBUG_MODE=true && python src/main.py
+set DEBUG_MODE=true & python src/main.py
 # Check generated debug images in data/debug/
 # Verify scale detection boundaries and water line detection
 ```
@@ -447,7 +458,7 @@ python src/main.py
 **GUI directory selection:**
 
 ```bash
-set USE_GUI_SELECTOR=true && python src/main.py
+set USE_GUI_SELECTOR=true & python src/main.py
 # Select directory via file dialog
 ```
 
@@ -455,7 +466,7 @@ set USE_GUI_SELECTOR=true && python src/main.py
 
 ```bash
 # Option 1: Enable via environment variable (overrides config)
-set DEBUG_MODE=true && python src/main.py
+set DEBUG_MODE=true & python src/main.py
 
 # Option 2: Enable via config.yaml (set debug.enabled: true)
 python src/main.py
@@ -477,7 +488,7 @@ The system includes a comprehensive visual debugging mode that creates annotated
 
 ```bash
 # Via environment variable
-set DEBUG_MODE=true && python src/main.py
+set DEBUG_MODE=true & python src/main.py
 
 # Or in .env file
 DEBUG_MODE=true
@@ -743,13 +754,13 @@ python src/calibration/analyze_scale_photo.py
 python src/main.py
 
 # 3. Test GUI interface
-set USE_GUI_SELECTOR=true && python src/main.py
+set USE_GUI_SELECTOR=true & python src/main.py
 
 # 4. Test calibration
-set CALIBRATION_MODE=true && python src/main.py
+set CALIBRATION_MODE=true & python src/main.py
 
 # 5. Test color detection with debug
-set DEBUG_MODE=true && python src/main.py
+set DEBUG_MODE=true & python src/main.py
 ```
 
 ### Code Style
@@ -769,7 +780,7 @@ The project follows standard Python conventions:
 
 - Ensure calibration file exists in `data/calibration/calibration.yaml`
 - Check calibration file path in logs
-- Run enhanced calibration: `python src/calibration/analyze_scale_photo.py` then `CALIBRATION_MODE=true python src/main.py`
+- Run enhanced calibration: `python src/calibration/analyze_scale_photo.py` then `set CALIBRATION_MODE=true & python src/main.py`
 
 **🆕 Scale detection completely missing/wrong:**
 
@@ -824,7 +835,7 @@ setup_logging(logging.DEBUG)
 Enable visual debugging:
 
 ```bash
-set DEBUG_MODE=true && python src/main.py
+set DEBUG_MODE=true & python src/main.py
 ```
 
 View logs:

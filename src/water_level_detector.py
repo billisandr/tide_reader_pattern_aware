@@ -498,6 +498,554 @@ class WaterLevelDetector:
         )
         
         return final_edges
+
+    def detect_scale_bounds_enhanced(self, image):
+        """
+        Enhanced scale detection that returns both vertical and horizontal bounds.
+        For fixed camera setups, prioritizes configured expected_position.
+        Returns: (scale_top_y, scale_bottom_y, scale_x_min, scale_x_max)
+        """
+        self.logger.debug("Starting enhanced scale bounds detection")
+        
+        # Check if we should use fixed camera mode (prioritize config position)
+        use_fixed_camera_mode = self.config['scale'].get('fixed_camera_mode', True)  # Default to True for fixed setups
+        
+        if use_fixed_camera_mode:
+            self.logger.debug("Using fixed camera mode - prioritizing configured expected_position")
+            
+            # Use configured position as primary source
+            scale_x_min = self.scale_region.get('x_min', 0)
+            scale_x_max = self.scale_region.get('x_max', image.shape[1])
+            scale_top_y = self.scale_region.get('y_min', 0)
+            scale_bottom_y = self.scale_region.get('y_max', image.shape[0])
+            
+            # Override with enhanced calibration data if available (more accurate)
+            if self.enhanced_calibration_data and self.enhanced_calibration_data.get('scale_boundaries'):
+                boundaries = self.enhanced_calibration_data['scale_boundaries']
+                scale_x_min = boundaries.get('x_min', scale_x_min)
+                scale_x_max = boundaries.get('x_max', scale_x_max)
+                scale_top_y = boundaries.get('y_min', scale_top_y)
+                scale_bottom_y = boundaries.get('y_max', scale_bottom_y)
+                self.logger.debug(f"Using enhanced calibration boundaries (fixed camera mode)")
+            
+            detection_method = "fixed_camera_config"
+        else:
+            # Use dynamic detection (legacy behavior)
+            self.logger.debug("Using dynamic detection mode")
+            scale_top_y, scale_bottom_y = self.detect_scale_bounds(image)
+            
+            if scale_top_y is None or scale_bottom_y is None:
+                self.logger.warning("Dynamic detection failed, falling back to config values")
+                scale_top_y = self.scale_region.get('y_min', 0)
+                scale_bottom_y = self.scale_region.get('y_max', image.shape[0])
+                detection_method = "config_fallback"
+            else:
+                detection_method = "dynamic_detection"
+            
+            # Horizontal bounds from enhanced calibration or config
+            if self.enhanced_calibration_data and self.enhanced_calibration_data.get('scale_boundaries'):
+                boundaries = self.enhanced_calibration_data['scale_boundaries']
+                scale_x_min = boundaries.get('x_min', self.scale_region.get('x_min', 0))
+                scale_x_max = boundaries.get('x_max', self.scale_region.get('x_max', image.shape[1]))
+            else:
+                scale_x_min = self.scale_region.get('x_min', 0)
+                scale_x_max = self.scale_region.get('x_max', image.shape[1])
+        
+        # Log the final scale bounds
+        self.logger.debug(f"Scale bounds ({detection_method}): Y=[{scale_top_y}, {scale_bottom_y}], X=[{scale_x_min}, {scale_x_max}]")
+        
+        # Debug visualization: Draw scale bounds
+        debug_image = image.copy()
+        cv2.rectangle(debug_image, (scale_x_min, scale_top_y), (scale_x_max, scale_bottom_y), (0, 255, 0), 3)
+        cv2.putText(debug_image, f"Scale Region ({detection_method})", (scale_x_min, scale_top_y - 10), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        
+        self.debug_viz.save_debug_image(
+            debug_image, 'scale_bounds_enhanced',
+            info_text=[
+                f"Detection method: {detection_method}",
+                f"Scale bounds: Y=[{scale_top_y},{scale_bottom_y}], X=[{scale_x_min},{scale_x_max}]",
+                f"Fixed camera mode: {use_fixed_camera_mode}"
+            ]
+        )
+        
+        return scale_top_y, scale_bottom_y, scale_x_min, scale_x_max
+
+    def detect_water_line_within_scale(self, image, scale_top_y, scale_bottom_y, scale_x_min, scale_x_max):
+        """
+        Detect waterline only within the detected scale boundaries.
+        This is much more efficient than scanning the entire image.
+        """
+        self.logger.debug(f"Detecting waterline within scale bounds: Y=[{scale_top_y},{scale_bottom_y}], X=[{scale_x_min},{scale_x_max}]")
+        
+        # Extract the scale region from the image
+        scale_region = image[scale_top_y:scale_bottom_y, scale_x_min:scale_x_max].copy()
+        
+        if scale_region.size == 0:
+            self.logger.error("Empty scale region extracted")
+            return None
+        
+        # Debug: Save the extracted scale region
+        self.debug_viz.save_debug_image(
+            scale_region, 'scale_region_extracted',
+            info_text=f"Extracted scale region: {scale_region.shape[1]}x{scale_region.shape[0]}"
+        )
+        
+        # INTEGRATED MULTI-METHOD DETECTION: Run all methods and select best result
+        local_water_y = self.detect_water_line_integrated_methods(scale_region)
+        
+        # Convert local coordinates back to global image coordinates
+        if local_water_y is not None:
+            global_water_y = scale_top_y + local_water_y
+            
+            # Apply waterline reference enhancement if available
+            if self.enhanced_calibration_data and self.enhanced_calibration_data.get('waterline_reference'):
+                global_water_y = self.enhance_water_detection_with_reference(global_water_y, image)
+            
+            self.logger.debug(f"Detected waterline at global Y={global_water_y} (local Y={local_water_y} + offset {scale_top_y})")
+            
+            # Debug visualization
+            debug_image = image.copy()
+            cv2.rectangle(debug_image, (scale_x_min, scale_top_y), (scale_x_max, scale_bottom_y), (0, 255, 0), 2)
+            cv2.line(debug_image, (scale_x_min, global_water_y), (scale_x_max, global_water_y), (0, 255, 255), 3)
+            cv2.putText(debug_image, f"Waterline Y={global_water_y}", (scale_x_min, global_water_y - 10),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+            
+            self.debug_viz.save_debug_image(
+                debug_image, 'waterline_within_scale',
+                info_text=f"Waterline detected at Y={global_water_y} within scale bounds"
+            )
+            
+            return global_water_y
+        else:
+            self.logger.warning("No waterline detected within scale bounds")
+            return None
+
+    def detect_water_line_edge_in_region(self, scale_region):
+        """
+        Detect waterline using edge detection within the scale region.
+        Returns local Y coordinate within the region.
+        """
+        gray = cv2.cvtColor(scale_region, cv2.COLOR_BGR2GRAY)
+        
+        # Apply blur to reduce noise
+        blurred = cv2.GaussianBlur(gray, (self.blur_kernel, self.blur_kernel), 0)
+        
+        # Apply edge detection
+        edges = cv2.Canny(blurred, self.edge_low, self.edge_high)
+        
+        # Find horizontal lines (potential waterlines)
+        lines = cv2.HoughLines(edges, 1, np.pi/180, threshold=min(50, scale_region.shape[1]//4))
+        
+        if lines is not None:
+            horizontal_lines = []
+            for line in lines:
+                rho, theta = line[0]
+                # Filter for nearly horizontal lines
+                if abs(theta - np.pi/2) < 0.2:  # Within ~11 degrees of horizontal
+                    y_position = rho / np.sin(theta) if np.sin(theta) != 0 else None
+                    if y_position is not None and 0 <= y_position < scale_region.shape[0]:
+                        horizontal_lines.append(y_position)
+            
+            if horizontal_lines:
+                # Return median Y coordinate
+                return int(np.median(horizontal_lines))
+        
+        # Fallback to gradient method
+        return self.detect_water_line_gradient_in_region(scale_region)
+
+    def detect_water_line_gradient_in_region(self, scale_region):
+        """
+        Detect waterline using gradient analysis within the scale region.
+        Returns local Y coordinate within the region.
+        """
+        gray = cv2.cvtColor(scale_region, cv2.COLOR_BGR2GRAY)
+        
+        # Calculate vertical gradient
+        grad_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=5)
+        grad_y = np.absolute(grad_y)
+        
+        # Find the row with maximum gradient (potential waterline)
+        row_gradients = np.mean(grad_y, axis=1)
+        
+        if len(row_gradients) > 0:
+            max_gradient_y = np.argmax(row_gradients)
+            
+            # Validate that it's a significant gradient
+            max_gradient_value = row_gradients[max_gradient_y]
+            mean_gradient = np.mean(row_gradients)
+            
+            if max_gradient_value > mean_gradient * 1.5:  # At least 50% above average
+                return max_gradient_y
+        
+        # Fallback: return middle of the region
+        return scale_region.shape[0] // 2
+
+    def detect_water_line_color_in_region(self, scale_region):
+        """
+        Detect waterline using color analysis within the scale region.
+        Returns local Y coordinate within the region.
+        """
+        # Convert to HSV
+        hsv = cv2.cvtColor(scale_region, cv2.COLOR_BGR2HSV)
+        
+        # Create water color mask
+        water_mask = cv2.inRange(hsv, self.water_hsv_lower, self.water_hsv_upper)
+        
+        # Find horizontal contours in water mask
+        cnts = cv2.findContours(water_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cnts = imutils.grab_contours(cnts)
+        
+        if cnts:
+            # Find the topmost water region (waterline)
+            min_y = scale_region.shape[0]
+            for c in cnts:
+                if cv2.contourArea(c) > 50:  # Minimum area threshold
+                    x, y, w, h = cv2.boundingRect(c)
+                    if y < min_y:
+                        min_y = y
+            
+            if min_y < scale_region.shape[0]:
+                return min_y
+        
+        # Fallback to gradient method
+        return self.detect_water_line_gradient_in_region(scale_region)
+
+    def detect_water_line_gradient_enhanced(self, scale_region):
+        """
+        Use enhanced calibration gradient data to detect waterline.
+        Returns local Y coordinate within the region.
+        """
+        gradient_data = self.enhanced_calibration_data.get('waterline_gradient')
+        if not gradient_data:
+            return None
+        
+        # Use the calibrated color ranges and gradient information
+        hsv = cv2.cvtColor(scale_region, cv2.COLOR_BGR2HSV)
+        gray = cv2.cvtColor(scale_region, cv2.COLOR_BGR2GRAY)
+        
+        # Try to use above/below water color ranges
+        if 'detection_ranges' in gradient_data:
+            ranges = gradient_data['detection_ranges']
+            
+            # Create masks for above and below water regions
+            above_water_mask = cv2.inRange(hsv, 
+                                         np.array(ranges['above_water_hsv']['lower']), 
+                                         np.array(ranges['above_water_hsv']['upper']))
+            
+            below_water_mask = cv2.inRange(hsv,
+                                         np.array(ranges['below_water_hsv']['lower']),
+                                         np.array(ranges['below_water_hsv']['upper']))
+            
+            # Find transition between the two regions
+            for y in range(scale_region.shape[0] - 1):
+                above_pixels = np.sum(above_water_mask[y, :] > 0)
+                below_pixels = np.sum(below_water_mask[y + 1, :] > 0)
+                
+                # If we find a transition from above-water to below-water colors
+                if above_pixels > scale_region.shape[1] * 0.3 and below_pixels > scale_region.shape[1] * 0.3:
+                    return y
+        
+        # Fallback: use the difference in grayscale values
+        if 'above_water' in gradient_data and 'below_water' in gradient_data:
+            above_mean = gradient_data['above_water']['gray_mean']
+            below_mean = gradient_data['below_water']['gray_mean']
+            threshold_gray = (above_mean + below_mean) / 2
+            
+            # Find the transition point
+            for y in range(scale_region.shape[0]):
+                row_mean = np.mean(gray[y, :])
+                if (above_mean > below_mean and row_mean < threshold_gray) or \
+                   (above_mean < below_mean and row_mean > threshold_gray):
+                    return y
+        
+        return None
+
+    def detect_water_line_integrated_methods(self, scale_region):
+        """
+        Integrated multi-method detection system that combines edge, color, and gradient methods.
+        Uses confidence scoring to select the best result.
+        """
+        self.logger.debug("Starting integrated multi-method waterline detection")
+        
+        detection_results = []
+        
+        # Method 1: Edge Detection
+        try:
+            edge_result = self.detect_water_line_edge_in_region(scale_region)
+            if edge_result is not None:
+                confidence = self.calculate_edge_detection_confidence(scale_region, edge_result)
+                detection_results.append({
+                    'method': 'edge',
+                    'y_position': edge_result,
+                    'confidence': confidence,
+                    'details': f'Edge detection at Y={edge_result}'
+                })
+                self.logger.debug(f"Edge method: Y={edge_result}, confidence={confidence:.3f}")
+        except Exception as e:
+            self.logger.warning(f"Edge detection failed: {e}")
+        
+        # Method 2: Color Detection
+        try:
+            color_result = self.detect_water_line_color_in_region(scale_region)
+            if color_result is not None:
+                confidence = self.calculate_color_detection_confidence(scale_region, color_result)
+                detection_results.append({
+                    'method': 'color',
+                    'y_position': color_result,
+                    'confidence': confidence,
+                    'details': f'Color detection at Y={color_result}'
+                })
+                self.logger.debug(f"Color method: Y={color_result}, confidence={confidence:.3f}")
+        except Exception as e:
+            self.logger.warning(f"Color detection failed: {e}")
+        
+        # Method 3: Gradient Detection
+        try:
+            gradient_result = self.detect_water_line_gradient_in_region(scale_region)
+            if gradient_result is not None:
+                confidence = self.calculate_gradient_detection_confidence(scale_region, gradient_result)
+                detection_results.append({
+                    'method': 'gradient',
+                    'y_position': gradient_result,
+                    'confidence': confidence,
+                    'details': f'Gradient detection at Y={gradient_result}'
+                })
+                self.logger.debug(f"Gradient method: Y={gradient_result}, confidence={confidence:.3f}")
+        except Exception as e:
+            self.logger.warning(f"Gradient detection failed: {e}")
+        
+        # Method 4: Enhanced Gradient (if available)
+        if self.enhanced_calibration_data and self.enhanced_calibration_data.get('waterline_gradient'):
+            try:
+                enhanced_result = self.detect_water_line_gradient_enhanced(scale_region)
+                if enhanced_result is not None:
+                    confidence = self.calculate_enhanced_detection_confidence(scale_region, enhanced_result)
+                    detection_results.append({
+                        'method': 'enhanced_gradient',
+                        'y_position': enhanced_result,
+                        'confidence': confidence,
+                        'details': f'Enhanced gradient detection at Y={enhanced_result}'
+                    })
+                    self.logger.debug(f"Enhanced gradient method: Y={enhanced_result}, confidence={confidence:.3f}")
+            except Exception as e:
+                self.logger.warning(f"Enhanced gradient detection failed: {e}")
+        
+        if not detection_results:
+            self.logger.warning("No detection methods produced results")
+            return None
+        
+        # Apply consensus analysis for similar results
+        consensus_result = self.apply_consensus_analysis(detection_results)
+        
+        # Select the best result based on confidence and consensus
+        best_result = self.select_best_detection_result(detection_results, consensus_result)
+        
+        if best_result:
+            self.logger.info(f"Selected {best_result['method']} method: {best_result['details']}, confidence={best_result['confidence']:.3f}")
+            
+            # Create visualization of all detection results
+            self.visualize_integrated_detection_results(scale_region, detection_results, best_result)
+            
+            return best_result['y_position']
+        else:
+            self.logger.warning("Failed to select best detection result")
+            return None
+
+    def calculate_edge_detection_confidence(self, scale_region, y_position):
+        """Calculate confidence score for edge detection result"""
+        gray = cv2.cvtColor(scale_region, cv2.COLOR_BGR2GRAY)
+        edges = cv2.Canny(gray, self.edge_low, self.edge_high)
+        
+        # Check edge strength at detected position
+        if 0 <= y_position < edges.shape[0]:
+            row_edges = edges[y_position, :]
+            edge_density = np.sum(row_edges > 0) / len(row_edges)
+            
+            # Check for horizontal continuity
+            continuity_score = 1.0 if edge_density > 0.3 else edge_density / 0.3
+            
+            # Check gradient strength
+            grad_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
+            gradient_strength = np.mean(np.abs(grad_y[y_position, :]))
+            
+            # Normalize to 0-1 scale
+            normalized_gradient = min(gradient_strength / 50.0, 1.0)
+            
+            return (continuity_score + normalized_gradient) / 2
+        
+        return 0.0
+
+    def calculate_color_detection_confidence(self, scale_region, y_position):
+        """Calculate confidence score for color detection result"""
+        hsv = cv2.cvtColor(scale_region, cv2.COLOR_BGR2HSV)
+        water_mask = cv2.inRange(hsv, self.water_hsv_lower, self.water_hsv_upper)
+        
+        if 0 <= y_position < water_mask.shape[0]:
+            # Check water color presence at detection line
+            row_water = water_mask[y_position, :]
+            water_ratio = np.sum(row_water > 0) / len(row_water)
+            
+            # Check color consistency in neighboring rows
+            consistency_score = 1.0
+            for offset in [-2, -1, 1, 2]:
+                check_y = y_position + offset
+                if 0 <= check_y < water_mask.shape[0]:
+                    neighbor_ratio = np.sum(water_mask[check_y, :] > 0) / water_mask.shape[1]
+                    if abs(water_ratio - neighbor_ratio) > 0.3:
+                        consistency_score *= 0.8
+            
+            return min(water_ratio * consistency_score, 1.0)
+        
+        return 0.0
+
+    def calculate_gradient_detection_confidence(self, scale_region, y_position):
+        """Calculate confidence score for gradient detection result"""
+        gray = cv2.cvtColor(scale_region, cv2.COLOR_BGR2GRAY)
+        grad_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=5)
+        
+        if 0 <= y_position < grad_y.shape[0]:
+            # Get gradient strength at detected position
+            row_gradient = np.mean(np.abs(grad_y[y_position, :]))
+            
+            # Compare with neighboring rows
+            neighbor_gradients = []
+            for offset in range(-3, 4):
+                check_y = y_position + offset
+                if 0 <= check_y < grad_y.shape[0]:
+                    neighbor_gradients.append(np.mean(np.abs(grad_y[check_y, :])))
+            
+            if neighbor_gradients:
+                max_neighbor_gradient = max(neighbor_gradients)
+                if max_neighbor_gradient > 0:
+                    relative_strength = row_gradient / max_neighbor_gradient
+                    return min(relative_strength, 1.0)
+        
+        return 0.0
+
+    def calculate_enhanced_detection_confidence(self, scale_region, y_position):
+        """Calculate confidence score for enhanced gradient detection result"""
+        gradient_data = self.enhanced_calibration_data.get('waterline_gradient')
+        if not gradient_data:
+            return 0.0
+        
+        # High confidence for enhanced method if it uses calibrated data
+        base_confidence = 0.8  # Enhanced method gets higher base confidence
+        
+        # Validate against expected color differences
+        if 'differences' in gradient_data:
+            gray = cv2.cvtColor(scale_region, cv2.COLOR_BGR2GRAY)
+            if 0 <= y_position < gray.shape[0]:
+                # Check if observed gradient matches expected
+                expected_diff = gradient_data['differences']['gray_diff']
+                
+                above_region = max(0, y_position - 10)
+                below_region = min(gray.shape[0], y_position + 10)
+                
+                if above_region < y_position < below_region:
+                    above_mean = np.mean(gray[above_region:y_position, :])
+                    below_mean = np.mean(gray[y_position:below_region, :])
+                    observed_diff = abs(above_mean - below_mean)
+                    
+                    # Compare with expected difference
+                    if expected_diff > 0:
+                        similarity = 1.0 - min(abs(observed_diff - expected_diff) / expected_diff, 1.0)
+                        return base_confidence * similarity
+        
+        return base_confidence
+
+    def apply_consensus_analysis(self, detection_results):
+        """Analyze consensus among detection methods"""
+        if len(detection_results) < 2:
+            return None
+        
+        # Group similar results (within 5 pixels)
+        consensus_groups = []
+        for result in detection_results:
+            placed = False
+            for group in consensus_groups:
+                if any(abs(result['y_position'] - r['y_position']) <= 5 for r in group):
+                    group.append(result)
+                    placed = True
+                    break
+            if not placed:
+                consensus_groups.append([result])
+        
+        # Find the largest consensus group
+        largest_group = max(consensus_groups, key=len)
+        
+        if len(largest_group) >= 2:
+            # Calculate consensus position and confidence
+            avg_position = np.mean([r['y_position'] for r in largest_group])
+            avg_confidence = np.mean([r['confidence'] for r in largest_group])
+            consensus_boost = len(largest_group) / len(detection_results)
+            
+            return {
+                'y_position': int(avg_position),
+                'confidence': avg_confidence * (1 + consensus_boost * 0.2),
+                'methods': [r['method'] for r in largest_group],
+                'count': len(largest_group)
+            }
+        
+        return None
+
+    def select_best_detection_result(self, detection_results, consensus_result):
+        """Select the best detection result considering confidence and consensus"""
+        # If we have strong consensus, prefer it
+        if consensus_result and consensus_result['confidence'] > 0.6 and consensus_result['count'] >= 2:
+            return {
+                'method': f"consensus({','.join(consensus_result['methods'])})",
+                'y_position': consensus_result['y_position'],
+                'confidence': consensus_result['confidence'],
+                'details': f"Consensus of {consensus_result['count']} methods at Y={consensus_result['y_position']}"
+            }
+        
+        # Otherwise, select highest confidence individual result
+        best_result = max(detection_results, key=lambda x: x['confidence'])
+        
+        # Boost confidence if enhanced method agrees with others
+        if best_result['method'] == 'enhanced_gradient':
+            for other in detection_results:
+                if other['method'] != 'enhanced_gradient' and abs(other['y_position'] - best_result['y_position']) <= 3:
+                    best_result['confidence'] = min(best_result['confidence'] * 1.1, 1.0)
+                    break
+        
+        return best_result
+
+    def visualize_integrated_detection_results(self, scale_region, detection_results, best_result):
+        """Create visualization showing all detection results"""
+        vis_image = scale_region.copy()
+        
+        # Draw all detection results
+        colors = {
+            'edge': (255, 0, 0),      # Blue
+            'color': (0, 255, 0),     # Green
+            'gradient': (0, 0, 255),  # Red
+            'enhanced_gradient': (255, 0, 255)  # Magenta
+        }
+        
+        for result in detection_results:
+            y = result['y_position']
+            method = result['method'].split('(')[0]  # Remove consensus info
+            color = colors.get(method, (128, 128, 128))
+            
+            # Draw detection line
+            cv2.line(vis_image, (0, y), (vis_image.shape[1], y), color, 2)
+            
+            # Add method label
+            cv2.putText(vis_image, f"{method}: {result['confidence']:.2f}", 
+                       (5, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
+        
+        # Highlight best result
+        best_y = best_result['y_position']
+        cv2.line(vis_image, (0, best_y), (vis_image.shape[1], best_y), (0, 255, 255), 4)
+        cv2.putText(vis_image, f"BEST: {best_result['method']}", 
+                   (5, best_y + 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+        
+        self.debug_viz.save_debug_image(
+            vis_image, 'integrated_detection_methods',
+            info_text=f"Multi-method detection: {len(detection_results)} methods, best={best_result['method']}"
+        )
     
     def detect_scale_bounds(self, image):
         """
@@ -702,11 +1250,12 @@ class WaterLevelDetector:
                     info_text=f"No resize applied, pixels/cm: {adjusted_pixels_per_cm:.2f}"
                 )
             
-            # Detect water line with debug annotations
-            water_line_y = self.detect_water_line(image)
+            # REDESIGNED WORKFLOW: Scale-first, then waterline within scale bounds
+            # Step 1: Detect scale bounds first
+            scale_top_y, scale_bottom_y, scale_x_min, scale_x_max = self.detect_scale_bounds_enhanced(image)
             
-            # Detect scale bounds
-            scale_top_y, scale_bottom_y = self.detect_scale_bounds(image)
+            # Step 2: Detect water line within scale bounds only
+            water_line_y = self.detect_water_line_within_scale(image, scale_top_y, scale_bottom_y, scale_x_min, scale_x_max)
             
             # Calculate water level
             result = self.calculate_water_level(

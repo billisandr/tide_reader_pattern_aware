@@ -12,6 +12,12 @@ This guide covers the new enhanced calibration workflow that incorporates waterl
 2. **Real Scale Measurements**: Uses actual scale readings instead of estimates
 3. **Submersion Handling**: Works with partially underwater scales
 4. **Enhanced Accuracy**: Precise cm/pixel calculation from measured segments
+5. **🔧 Recent Fixes**: 
+   - Fixed YAML serialization errors with numpy objects
+   - Improved image display timing - shows image before measurement input
+   - Enhanced waterline gradient analysis with proper data structure
+   - Cleaned up output messages (removed problematic Unicode characters)
+   - Fixed Windows command syntax throughout documentation
 
 ## Enhanced Workflow Process
 
@@ -31,8 +37,16 @@ python src/calibration/analyze_scale_photo.py
 
 ### Step 3: Interactive Calibration Process
 
-#### Phase 1: Scale Boundary Selection
-1. **Click 4 corners** of the ENTIRE visible scale:
+#### Phase 1: Image Display and Scale Measurements
+1. **🔧 Image Window Opens**: The calibration image is now displayed before asking for measurements
+2. **Enter actual scale readings** while viewing the image:
+   - **Top measurement**: Scale reading at the TOP of visible scale (e.g., 485.0 cm)
+   - **Waterline measurement**: Scale reading at the current waterline (e.g., 420.0 cm)
+   
+   **🔧 Improvement**: Image is visible during measurement entry for better accuracy
+
+#### Phase 2: Scale Boundary Selection  
+3. **Click 4 corners** of the ENTIRE visible scale:
    - Top-left corner of scale
    - Top-right corner of scale  
    - Bottom-left corner of scale
@@ -40,22 +54,15 @@ python src/calibration/analyze_scale_photo.py
    
    **Important**: Select the full scale boundary, even if parts are underwater
 
-#### Phase 2: Waterline Marking
-2. **Click 2 waterline points**:
+#### Phase 3: Waterline Marking
+4. **Click 2 waterline points**:
    - Left edge of scale at current waterline
    - Right edge of scale at current waterline
    
    **Tip**: These points should be horizontally aligned at the water surface
 
-#### Phase 3: Real Scale Measurements
-3. **Enter actual scale readings**:
-   - **Top measurement**: Scale reading at the TOP of your outlined area (e.g., 485.0 cm)
-   - **Waterline measurement**: Scale reading at the current waterline (e.g., 420.0 cm)
-   
-   **Example**: If top shows 485cm and waterline shows 420cm, the system calculates precise pixels/cm from the 65cm difference
-
 #### Phase 4: Optional Color Sampling
-4. **Click color samples** (optional but recommended):
+5. **Click color samples** (optional but recommended):
    - Scale background color
    - Scale marking/text color
    - Water color (if visible)
@@ -64,9 +71,11 @@ python src/calibration/analyze_scale_photo.py
 
 The enhanced analysis generates:
 
-1. **Updated config.yaml suggestions** with optimal coordinates
-2. **Enhanced calibration.yaml** with waterline data
-3. **Precise pixels/cm ratio** from real measurements
+1. **🔧 Waterline gradient analysis**: Advanced color analysis above/below waterline
+2. **Updated config.yaml suggestions** with optimal coordinates  
+3. **Enhanced calibration.yaml** with waterline data
+4. **Precise pixels/cm ratio** from real measurements
+5. **🔧 Summary display**: Clear config.yaml suggestions shown at the end for easy copying
 
 ## Benefits of Enhanced Calibration
 
@@ -148,7 +157,7 @@ After running enhanced calibration:
 
 ```bash
 # Apply the enhanced calibration data
-set CALIBRATION_MODE=true && python src/main.py
+set CALIBRATION_MODE=true & python src/main.py
 
 # Start normal processing with enhanced accuracy
 python src/main.py
