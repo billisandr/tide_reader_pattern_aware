@@ -68,9 +68,5 @@ temp/
 ehthumbs.db
 Thumbs.db
 
-# Documentation drafts
-testing_issues_documentation.md
-system_documentation_draft.md
-alt_approaches.md
-waterline_detection_guide.md
-coordinate_system_warning.md
+# Documentation files
+documentation/
