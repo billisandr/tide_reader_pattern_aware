@@ -70,3 +70,6 @@ Thumbs.db
 
 # Documentation files
 documentation/
+
+# Pattern-aware documentation
+src_pattern_aware/CUSTOM_TEMPLATES_GUIDE.md

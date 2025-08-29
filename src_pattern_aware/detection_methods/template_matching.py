@@ -8,7 +8,9 @@ detects water interfaces in the remaining regions.
 import cv2
 import numpy as np
 import logging
+import os
 from pathlib import Path
+from scipy import ndimage
 
 class TemplateMatchingDetector:
     """
@@ -38,11 +40,247 @@ class TemplateMatchingDetector:
         self.match_threshold = template_config.get('threshold', 0.7)
         self.max_templates = template_config.get('max_templates', 10)
         
+        # Advanced preprocessing settings
+        preprocessing_config = template_config.get('preprocessing', {})
+        self.use_mean_shift = preprocessing_config.get('mean_shift_filtering', True)
+        self.use_adaptive_threshold = preprocessing_config.get('adaptive_thresholding', True)  
+        self.use_morphological_cleaning = preprocessing_config.get('morphological_cleaning', True)
+        
+        # NMS settings
+        nms_config = template_config.get('nms', {})
+        self.use_nms = nms_config.get('enabled', True)
+        self.nms_threshold = nms_config.get('threshold', 0.4)
+        self.nms_confidence_threshold = nms_config.get('confidence_threshold', 0.5)
+        
+        # Template-specific thresholds
+        self.template_thresholds = template_config.get('template_thresholds', {})
+        
+        # Check environment variables for template source override
+        env_template_source = os.environ.get('TEMPLATE_SOURCE', '').lower()
+        if env_template_source in ['local', 'manager', 'both']:
+            self.template_source = env_template_source
+            self.logger.info(f"Template source overridden by environment variable: {env_template_source}")
+        else:
+            self.template_source = template_config.get('template_source', 'local')
+        
+        # Check environment variable for default templates
+        env_use_defaults = os.environ.get('USE_DEFAULT_TEMPLATES', '').lower()
+        if env_use_defaults in ['true', 'false']:
+            self.use_default_templates = env_use_defaults == 'true'
+            self.logger.info(f"Use default templates overridden by environment variable: {self.use_default_templates}")
+        else:
+            self.use_default_templates = template_config.get('use_default_templates', True)
+        
         # Detection parameters
         self.min_water_interface_width = 0.6  # Minimum width for water interface (% of scale width)
         self.horizontal_emphasis = True       # Emphasize horizontal features
         
-        self.logger.info(f"Template matching detector initialized (threshold: {self.match_threshold})")
+        # Initialize template storage
+        self.templates = {}
+        
+        # Create default templates if enabled
+        if self.use_default_templates and self.template_source in ['local', 'both']:
+            self.create_templates()
+        
+        self.logger.info(f"Template matching detector initialized (threshold: {self.match_threshold}, source: {self.template_source})")
+    
+    def create_templates(self):
+        """
+        Create sophisticated template patterns for E-shaped markings and graduation lines
+        Based on typical stadia rod marking patterns with improved accuracy
+        """
+        # Template for E-pattern (major graduations) - Enhanced version
+        e_template = np.zeros((20, 15), dtype=np.uint8)
+        # Create E-shape: horizontal lines at top, middle, bottom
+        e_template[2:4, 2:13] = 255    # Top horizontal
+        e_template[9:11, 2:8] = 255    # Middle horizontal  
+        e_template[16:18, 2:13] = 255  # Bottom horizontal
+        e_template[2:18, 2:4] = 255    # Vertical line
+        self.templates['e_major'] = e_template
+        
+        # Template for simple line (minor graduations) 
+        line_template = np.zeros((15, 3), dtype=np.uint8)
+        line_template[:, 1] = 255  # Vertical line
+        self.templates['line_minor'] = line_template
+        
+        # Template for thick line (intermediate graduations)
+        thick_line = np.zeros((18, 5), dtype=np.uint8) 
+        thick_line[:, 1:4] = 255
+        self.templates['line_thick'] = thick_line
+        
+        # Add additional sophisticated templates for better detection
+        
+        # Template for number markings (common on stadia rods)
+        number_template = np.zeros((24, 12), dtype=np.uint8)
+        # Create a basic rectangular pattern for numbers
+        number_template[4:20, 2:10] = 128  # Gray background for numbers
+        number_template[6:8, 3:9] = 255    # Top line
+        number_template[14:16, 3:9] = 255  # Bottom line
+        self.templates['number_marking'] = number_template
+        
+        # Template for L-shaped markings (sometimes used for major graduations)
+        l_template = np.zeros((16, 12), dtype=np.uint8)
+        l_template[2:14, 2:4] = 255   # Vertical part of L
+        l_template[12:14, 4:10] = 255 # Horizontal part of L
+        self.templates['l_major'] = l_template
+        
+        self.logger.info(f"Created {len(self.templates)} sophisticated stadia rod templates")
+        
+        # Store template metadata for advanced matching (use config thresholds if available)
+        default_thresholds = {
+            'e_major': 0.6,
+            'line_minor': 0.7,
+            'line_thick': 0.65,
+            'number_marking': 0.5,
+            'l_major': 0.6
+        }
+        
+        self.template_metadata = {}
+        for template_name, default_threshold in default_thresholds.items():
+            configured_threshold = self.template_thresholds.get(template_name, default_threshold)
+            template_type = 'major' if 'major' in template_name else ('minor' if 'minor' in template_name else 'intermediate')
+            priority = 1 if template_type == 'major' else (3 if template_type == 'minor' else 2)
+            
+            self.template_metadata[template_name] = {
+                'type': template_type,
+                'threshold': configured_threshold,
+                'priority': priority
+            }
+    
+    def _get_templates(self):
+        """
+        Get templates based on configured template source.
+        
+        Returns:
+            list: List of template images
+        """
+        templates = []
+        
+        # Get local templates
+        if self.template_source in ['local', 'both']:
+            local_templates = list(self.templates.values()) if self.templates else []
+            templates.extend(local_templates)
+            if local_templates:
+                self.logger.debug(f"Retrieved {len(local_templates)} local templates")
+        
+        # Get templates from template manager
+        if self.template_source in ['manager', 'both'] and self.template_manager:
+            try:
+                manager_templates = self.template_manager.get_templates() if hasattr(self.template_manager, 'get_templates') else []
+                if manager_templates:
+                    templates.extend(manager_templates)
+                    self.logger.debug(f"Retrieved {len(manager_templates)} templates from manager")
+            except Exception as e:
+                self.logger.warning(f"Failed to get templates from manager: {e}")
+        
+        # Apply max_templates limit
+        if len(templates) > self.max_templates:
+            templates = templates[:self.max_templates]
+            self.logger.debug(f"Limited templates to {self.max_templates}")
+        
+        self.logger.debug(f"Total templates available: {len(templates)}")
+        return templates
+    
+    def preprocess_scale_region(self, scale_region):
+        """
+        Preprocess the scale region for better template matching
+        Based on advanced preprocessing from StadiaRodReader
+        """
+        # Convert to grayscale if needed
+        if len(scale_region.shape) == 3:
+            gray = cv2.cvtColor(scale_region, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = scale_region.copy()
+        
+        # Apply mean shift filtering to reduce noise while preserving edges (configurable)
+        if len(scale_region.shape) == 3 and self.use_mean_shift:
+            try:
+                filtered = cv2.pyrMeanShiftFiltering(scale_region, 20, 30)
+                gray = cv2.cvtColor(filtered, cv2.COLOR_BGR2GRAY)
+                self.logger.debug("Applied mean shift filtering for noise reduction")
+            except Exception as e:
+                self.logger.warning(f"Mean shift filtering failed: {e}, using original")
+                gray = cv2.cvtColor(scale_region, cv2.COLOR_BGR2GRAY)
+        
+        # Apply adaptive thresholding for better contrast (configurable)
+        if self.use_adaptive_threshold:
+            try:
+                binary = cv2.adaptiveThreshold(
+                    gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, 
+                    cv2.THRESH_BINARY, 11, 2
+                )
+                self.logger.debug("Applied adaptive thresholding")
+            except Exception as e:
+                self.logger.warning(f"Adaptive thresholding failed: {e}, using simple threshold")
+                _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        else:
+            # Simple thresholding as fallback
+            _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            self.logger.debug("Used simple OTSU thresholding")
+        
+        # Apply morphological operations to clean up (configurable)
+        if self.use_morphological_cleaning:
+            kernel = np.ones((2,2), np.uint8)
+            try:
+                cleaned = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
+                self.logger.debug("Applied morphological cleaning")
+            except Exception as e:
+                self.logger.warning(f"Morphological operations failed: {e}")
+                cleaned = binary
+        else:
+            cleaned = binary
+        
+        return gray, binary, cleaned
+    
+    def apply_non_maximum_suppression(self, matches, template_size, nms_threshold=None):
+        """
+        Remove overlapping detections using Non-Maximum Suppression
+        Adapted from StadiaRodReader implementation
+        """
+        if not matches or not self.use_nms:
+            return matches
+        
+        # Use configured NMS threshold if not provided
+        if nms_threshold is None:
+            nms_threshold = self.nms_threshold
+        
+        # Filter matches by confidence threshold first
+        confidence_filtered = [m for m in matches if m['confidence'] >= self.nms_confidence_threshold]
+        
+        if not confidence_filtered:
+            return []
+        
+        # Convert to format suitable for NMS
+        boxes = []
+        scores = []
+        
+        for match in confidence_filtered:
+            x, y = match['position']
+            w, h = template_size
+            boxes.append([x, y, x+w, y+h])
+            scores.append(match['confidence'])
+        
+        if not boxes:
+            return []
+        
+        try:
+            boxes = np.array(boxes, dtype=np.float32)
+            scores = np.array(scores, dtype=np.float32)
+            
+            # Apply OpenCV's NMS
+            indices = cv2.dnn.NMSBoxes(
+                boxes.tolist(), scores.tolist(), self.nms_confidence_threshold, nms_threshold
+            )
+            
+            if len(indices) > 0:
+                indices = indices.flatten()
+                filtered_matches = [matches[i] for i in indices]
+                self.logger.debug(f"NMS reduced {len(matches)} matches to {len(filtered_matches)}")
+                return filtered_matches
+        except Exception as e:
+            self.logger.warning(f"NMS failed: {e}, returning original matches")
+        
+        return matches
     
     def detect_waterline(self, scale_region):
         """
@@ -58,8 +296,8 @@ class TemplateMatchingDetector:
             return None
         
         try:
-            # Get templates from template manager
-            templates = self.template_manager.get_templates()
+            # Get templates based on configuration
+            templates = self._get_templates()
             
             if not templates:
                 self.logger.debug("No templates available, using template-free detection")
@@ -87,7 +325,7 @@ class TemplateMatchingDetector:
     
     def _create_marking_mask(self, scale_region, templates):
         """
-        Create a mask of scale markings using template matching.
+        Create a mask of scale markings using advanced template matching.
         
         Args:
             scale_region: Scale region image
@@ -96,19 +334,25 @@ class TemplateMatchingDetector:
         Returns:
             np.ndarray: Binary mask (0=marking, 255=clear)
         """
-        gray = cv2.cvtColor(scale_region, cv2.COLOR_BGR2GRAY)
+        # Apply advanced preprocessing
+        gray, binary, cleaned = self.preprocess_scale_region(scale_region)
         height, width = gray.shape
         
         # Start with all areas available (white = available, black = marked)
         mask = np.ones_like(gray, dtype=np.uint8) * 255
         
-        marking_count = 0
+        total_marking_count = 0
+        all_detections = []
         
-        for i, template in enumerate(templates):
-            if i >= self.max_templates:
-                break
-            
+        # Use local templates with metadata for sophisticated matching
+        local_templates = self.templates if self.template_source in ['local', 'both'] else {}
+        
+        for template_name, template in local_templates.items():
             try:
+                # Get template metadata for adaptive thresholds
+                metadata = getattr(self, 'template_metadata', {}).get(template_name, {})
+                threshold = metadata.get('threshold', self.match_threshold)
+                
                 # Ensure template is grayscale
                 if len(template.shape) == 3:
                     template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
@@ -117,33 +361,75 @@ class TemplateMatchingDetector:
                 if template.shape[0] >= height * 0.8 or template.shape[1] >= width * 0.8:
                     continue
                 
-                # Perform template matching
-                result = cv2.matchTemplate(gray, template, cv2.TM_CCOEFF_NORMED)
+                # Perform template matching on both cleaned and original gray images
+                matches_cleaned = []
+                matches_gray = []
                 
-                # Find matches above threshold
-                locations = np.where(result >= self.match_threshold)
+                # Match on cleaned image (better for high contrast markings)
+                try:
+                    result = cv2.matchTemplate(cleaned, template, cv2.TM_CCOEFF_NORMED)
+                    locations = np.where(result >= threshold)
+                    
+                    for pt in zip(*locations[::-1]):
+                        confidence = result[pt[1], pt[0]]
+                        matches_cleaned.append({
+                            'position': pt,
+                            'confidence': confidence,
+                            'template': template_name,
+                            'source': 'cleaned'
+                        })
+                except Exception as e:
+                    self.logger.warning(f"Template matching on cleaned image failed for {template_name}: {e}")
                 
-                # Mark matching areas in the mask
-                for pt in zip(*locations[::-1]):  # Switch x,y coordinates
-                    x, y = pt
-                    h, w = template.shape
+                # Match on gray image (better for subtle markings)
+                try:
+                    result = cv2.matchTemplate(gray, template, cv2.TM_CCOEFF_NORMED)
+                    locations = np.where(result >= threshold * 0.8)  # Slightly lower threshold for gray
                     
-                    # Create a buffer around the match to ensure complete suppression
-                    buffer = 2
-                    x1 = max(0, x - buffer)
-                    y1 = max(0, y - buffer)
-                    x2 = min(width, x + w + buffer)
-                    y2 = min(height, y + h + buffer)
+                    for pt in zip(*locations[::-1]):
+                        confidence = result[pt[1], pt[0]]
+                        matches_gray.append({
+                            'position': pt,
+                            'confidence': confidence,
+                            'template': template_name,
+                            'source': 'gray'
+                        })
+                except Exception as e:
+                    self.logger.warning(f"Template matching on gray image failed for {template_name}: {e}")
+                
+                # Combine matches and apply NMS
+                all_matches = matches_cleaned + matches_gray
+                if all_matches:
+                    template_size = template.shape[::-1]  # w,h
+                    filtered_matches = self.apply_non_maximum_suppression(all_matches, template_size)
+                    all_detections.extend(filtered_matches)
                     
-                    # Mark this area as a marking (black = marking)
-                    cv2.rectangle(mask, (x1, y1), (x2, y2), 0, -1)
-                    marking_count += 1
+                    # Mark matching areas in the mask
+                    for match in filtered_matches:
+                        x, y = match['position']
+                        h, w = template.shape
+                        
+                        # Create a buffer around the match to ensure complete suppression
+                        buffer = 3  # Slightly larger buffer for better suppression
+                        x1 = max(0, x - buffer)
+                        y1 = max(0, y - buffer)
+                        x2 = min(width, x + w + buffer)
+                        y2 = min(height, y + h + buffer)
+                        
+                        # Mark this area as a marking (black = marking)
+                        cv2.rectangle(mask, (x1, y1), (x2, y2), 0, -1)
+                        total_marking_count += 1
                 
             except Exception as e:
-                self.logger.warning(f"Error matching template {i}: {e}")
+                self.logger.warning(f"Error matching template {template_name}: {e}")
                 continue
         
-        self.logger.debug(f"Template matching found {marking_count} marking instances")
+        self.logger.debug(f"Advanced template matching found {total_marking_count} marking instances from {len(all_detections)} total detections")
+        
+        # Store detections for potential debugging/visualization
+        if hasattr(self, 'debug_patterns') and self.debug_patterns:
+            self.last_detections = all_detections
+        
         return mask
     
     def _apply_marking_mask(self, scale_region, marking_mask):
@@ -359,12 +645,25 @@ class TemplateMatchingDetector:
     
     def get_detection_info(self):
         """Get information about the template matching detector."""
-        template_count = self.template_manager.get_template_count()
+        local_template_count = len(self.templates)
+        manager_template_count = 0
+        
+        if self.template_manager and hasattr(self.template_manager, 'get_template_count'):
+            try:
+                manager_template_count = self.template_manager.get_template_count()
+            except:
+                manager_template_count = 0
+        
+        total_templates = len(self._get_templates())
         
         return {
             'method': 'template_matching',
+            'template_source': self.template_source,
             'match_threshold': self.match_threshold,
             'max_templates': self.max_templates,
-            'available_templates': template_count,
-            'templates_loaded': template_count > 0
+            'local_templates': local_template_count,
+            'manager_templates': manager_template_count,
+            'total_available_templates': total_templates,
+            'templates_loaded': total_templates > 0,
+            'use_default_templates': self.use_default_templates
         }

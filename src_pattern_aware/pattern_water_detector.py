@@ -12,6 +12,9 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
+# Import debug visualizer
+from .debug_visualizer import DebugVisualizer
+
 # Import detection methods
 from .detection_methods.template_matching import TemplateMatchingDetector
 from .detection_methods.morphological_detector import MorphologicalDetector
@@ -57,6 +60,10 @@ class PatternWaterDetector:
         self.blur_kernel = config['detection']['blur_kernel_size']
         self.scale_height_cm = config['scale']['total_height']
         
+        # Initialize debug visualizer
+        debug_enabled = config.get('debug', {}).get('enabled', False) and self.debug_patterns
+        self.debug_viz = DebugVisualizer(config, enabled=debug_enabled)
+        
         # Initialize pattern analysis components
         self.template_manager = TemplateManager(config)
         self.pattern_classifier = PatternClassifier(config)
@@ -99,7 +106,7 @@ class PatternWaterDetector:
         
         # Integrated Pattern Detector (combines all methods)
         self.integrated_detector = IntegratedPatternDetector(
-            self.config, self.detection_methods, self.pattern_classifier
+            self.config, self.detection_methods, self.pattern_classifier, self.debug_viz
         )
         
         self.logger.info(f"Initialized {len(self.detection_methods)} pattern detection methods")
@@ -156,11 +163,26 @@ class PatternWaterDetector:
             
             self.logger.info(f"Processing image with pattern-aware detection: {Path(image_path).name}")
             
+            # Start debug session for this image
+            self.debug_viz.start_image_debug(image_path)
+            
+            # Debug: Save original image
+            self.debug_viz.save_debug_image(
+                image, 'pattern_original',
+                info_text=f"Original image: {image.shape[1]}x{image.shape[0]}"
+            )
+            
             # Extract scale region using existing calibration
             scale_region, scale_bounds = self._extract_scale_region(image)
             if scale_region is None:
                 self.logger.error("Failed to extract scale region")
                 return None
+            
+            # Debug: Save extracted scale region
+            self.debug_viz.save_debug_image(
+                scale_region, 'pattern_scale_region',
+                info_text=f"Scale region: {scale_bounds}"
+            )
             
             # Detect water line using pattern-aware methods
             water_line_y = self._detect_water_line_pattern_aware(scale_region, image_path)
@@ -175,6 +197,34 @@ class PatternWaterDetector:
             
             # Convert local coordinates to global coordinates
             global_y = water_line_y + scale_bounds['y_min']
+            
+            # Debug: Save water line detection result
+            water_line_annotations = {
+                'lines': [{
+                    'x1': scale_bounds['x_min'],
+                    'y1': global_y,
+                    'x2': scale_bounds['x_max'],
+                    'y2': global_y,
+                    'color': (0, 255, 255),  # Yellow
+                    'thickness': 3,
+                    'label': f'Pattern Water Line (Y={global_y})'
+                }],
+                'rectangles': [{
+                    'x': scale_bounds['x_min'],
+                    'y': scale_bounds['y_min'],
+                    'w': scale_bounds['x_max'] - scale_bounds['x_min'],
+                    'h': scale_bounds['y_max'] - scale_bounds['y_min'],
+                    'color': (0, 255, 0),
+                    'thickness': 2,
+                    'label': 'Scale Region'
+                }]
+            }
+            
+            self.debug_viz.save_debug_image(
+                image, 'pattern_water_detection',
+                annotations=water_line_annotations,
+                info_text=f"Pattern-based water line at Y={global_y} (engine: {self.pattern_engine})"
+            )
             
             # Calculate water level in cm
             water_level_cm = self._calculate_water_level(global_y, image.shape[0])

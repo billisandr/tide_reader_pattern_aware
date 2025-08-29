@@ -307,8 +307,25 @@ detection:
   pattern_aware:
     template_matching:
       enabled: true
-      threshold: 0.7          # Template match confidence
-      max_templates: 10       # Maximum templates to store
+      threshold: 0.7                    # Template match confidence
+      max_templates: 10                 # Maximum templates to store
+      template_source: 'local'          # Template source: 'local', 'manager', 'both'
+      use_default_templates: true       # Create default stadia rod templates
+```
+
+**Dual Template Sourcing:**
+
+The template matching system supports flexible template sourcing:
+
+- **'local'**: Uses built-in default templates (E-patterns, lines, thick lines)
+- **'manager'**: Uses external template manager (when available)
+- **'both'**: Combines local and external templates for maximum coverage
+
+**Environment Variable Override:**
+
+```bash
+set TEMPLATE_SOURCE=both              # Override config template source
+set USE_DEFAULT_TEMPLATES=true        # Override default template creation
 ```
 
 **Status:** FULLY IMPLEMENTED AND WORKING
@@ -426,6 +443,10 @@ detection:
 PATTERN_AWARE_MODE=true              # Enable pattern-aware detection
 PATTERN_AWARE_MODE=hybrid            # Enable hybrid mode (both systems)
 PATTERN_AWARE_MODE=false             # Force standard detection
+
+# Template configuration
+TEMPLATE_SOURCE=local                # Template source: 'local', 'manager', 'both'
+USE_DEFAULT_TEMPLATES=true           # Enable/disable default stadia rod templates
 
 # Debug options
 PATTERN_DEBUG=true                   # Enable pattern analysis debugging

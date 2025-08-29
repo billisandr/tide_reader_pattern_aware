@@ -97,7 +97,7 @@ detection:
   
   # NEW: Pattern-aware detection system
   pattern_aware:
-    enabled: false                    # Enable pattern-aware detection
+    enabled: true                   # Enable pattern-aware detection
     engine: 'integrated_pattern'      # Pattern detection engine
     fallback_to_standard: true        # Fall back to standard methods if pattern fails
     
@@ -106,6 +106,27 @@ detection:
       enabled: true
       threshold: 0.7                  # Template match confidence
       max_templates: 10               # Maximum templates to store
+      template_source: 'local'        # Options: 'local', 'manager', 'both'
+      use_default_templates: true     # Create default stadia rod templates
+      
+      # Advanced template matching settings
+      preprocessing:
+        mean_shift_filtering: true      # Apply mean shift filtering for noise reduction
+        adaptive_thresholding: true     # Use adaptive thresholding for better contrast
+        morphological_cleaning: true    # Apply morphological operations
+      
+      nms:
+        enabled: true                   # Enable Non-Maximum Suppression
+        threshold: 0.4                  # NMS overlap threshold
+        confidence_threshold: 0.5       # Minimum confidence for NMS
+      
+      # Template-specific thresholds (override global threshold)
+      template_thresholds:
+        e_major: 0.6                    # E-pattern major graduations
+        line_minor: 0.7                 # Simple line minor graduations
+        line_thick: 0.65                # Thick line intermediate graduations
+        number_marking: 0.5             # Number markings on rod
+        l_major: 0.6                    # L-shaped major graduations
     
     morphological:
       enabled: true
@@ -134,8 +155,8 @@ processing:
 
 # NEW: Pattern-aware processing mode
 pattern_processing:
-  mode: 'standard'                    # Options: 'standard', 'pattern_aware', 'hybrid'
-  debug_patterns: false               # Save pattern analysis debug images
+  mode: 'pattern_aware'                    # Options: 'standard', 'pattern_aware', 'hybrid'
+  debug_patterns: true                # Save pattern analysis debug images
   save_templates: true                # Save extracted templates for reuse
   template_directory: 'data/pattern_templates/scale_markings'
   
@@ -169,3 +190,14 @@ debug:
       - 'scale_detection'
       - 'water_detection'
       - 'final_result'
+      # Pattern-aware debugging steps
+      - 'pattern_original'          # Original image for pattern processing
+      - 'pattern_scale_region'      # Extracted scale region for pattern analysis
+      - 'pattern_preprocessing'     # Scale region preprocessed for pattern detection
+      - 'pattern_template_matching_result'  # Template matching results
+      - 'pattern_morphological_result'      # Morphological analysis results
+      - 'pattern_frequency_result'          # Frequency analysis results
+      - 'pattern_lsd_result'                # Line segment detection results
+      - 'pattern_contour_result'            # Contour analysis results
+      - 'pattern_methods_summary'           # Summary of all pattern method results
+      - 'pattern_water_detection'           # Final pattern-based water line detection
