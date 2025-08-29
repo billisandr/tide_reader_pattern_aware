@@ -59,6 +59,197 @@ This system provides automated water/tide level detection and measurement using 
 - **🔴 Web Interface**: HTTPS server for remote access and image upload
 - **Reporting**: Automated measurement reports and visualizations
 
+## Quick Use Guide
+
+This guide provides a step-by-step workflow for getting the system running quickly:
+
+### Step 1: Setup and Dependencies
+
+```bash
+# Clone the repository
+git clone <your-repo-url>
+cd tide-level-img-proc-backup
+
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Create data directories
+mkdir -p data/input data/calibration data/output data/debug
+```
+
+### Step 2: Run Enhanced Scale Analysis
+
+Before calibration, analyze your scale setup:
+
+```bash
+# Place your calibration image as data/calibration/calibration_image.jpg
+# Run the interactive analysis tool
+python src/calibration/analyze_scale_photo.py
+```
+
+**Follow the interactive prompts:**
+1. Enter actual scale readings (top and waterline positions)
+2. Click 4 scale corners (even if partially underwater)  
+3. Mark waterline position (left and right edges)
+4. Optionally sample scale colors and water color
+5. Review generated config.yaml suggestions
+
+**Apply the results:** Copy the suggested values to your `config.yaml`
+
+### Step 3: Configure Detection Method
+
+Edit `config.yaml` to set detection method and forced method:
+
+```yaml
+detection:
+  method: 'integrated'                    # Run all methods
+  forced_method: 'enhanced_gradient'      # Force best method
+  
+  # Environment variables for testing
+  USE_GUI_SELECTOR: true                  # Enable folder selection GUI
+  DEBUG_MODE: true                        # Enable debug images
+  CALIBRATION_MODE: false                 # Set to true for calibration
+```
+
+### Step 4: Set Environment Variables
+
+```bash
+# Windows Command Prompt
+set USE_GUI_SELECTOR=true
+set DEBUG_MODE=true
+set CALIBRATION_MODE=false
+```
+
+Or create a `.env` file:
+```bash
+USE_GUI_SELECTOR=true
+DEBUG_MODE=true  
+CALIBRATION_MODE=false
+```
+
+### Step 5: Run System Calibration
+
+```bash
+# Run calibration mode to generate calibration.yaml
+set CALIBRATION_MODE=true & python src/main.py
+```
+
+**Calibration generates:**
+- `data/calibration/calibration.yaml` with precise pixel/cm ratio
+- Enhanced waterline reference data
+- Scale marking analysis (if available)
+
+### Step 6: Add Test Images
+
+```bash
+# Place test images in any folder (e.g., data/input_tests/)
+# System will prompt for folder selection if USE_GUI_SELECTOR=true
+```
+
+### Step 7: Run Water Level Detection
+
+```bash
+# Run main detection system
+python src/main.py
+```
+
+**When prompted:** Select your image folder via GUI dialog
+
+### Step 8: Monitor Logs and Results
+
+**Key log messages to watch for:**
+
+```bash
+# Successful startup
+INFO - Using enhanced waterline-aware calibration (confidence: 0.98)
+INFO - FORCED METHOD CONFIGURED: Will always use 'enhanced_gradient' method
+
+# Detection results for each image
+INFO - Detection summary: 4 method(s) found results
+INFO -   enhanced_gradient: Y=17, confidence=0.874
+INFO -   edge: Y=274, confidence=0.563  
+INFO -   color: Y=0, confidence=0.267
+INFO -   gradient: Y=278, confidence=1.000
+INFO - FORCED METHOD: Using 'enhanced_gradient' method (Y=17, confidence=0.874)
+
+# Final measurements
+INFO - Processed IMG_0154.JPG: Water level = 445.5cm
+```
+
+### Step 9: Check Debug Images
+
+Debug images are saved in `data/debug/debug_session_TIMESTAMP/`:
+
+```bash
+# Key debug images to review:
+data/debug/debug_session_20250829_102135/
+├── original/                    # Original input images
+├── scale_detection/            # Scale boundary detection
+├── waterline_within_scale/     # Waterline detection results  
+├── final_result/               # Final annotated results
+└── IMG_XXXX_summary.jpg        # Processing summary per image
+```
+
+**What to check in debug images:**
+- Scale boundaries are correctly detected (blue rectangles)
+- Waterline detection is accurate (green lines)
+- Final measurements are overlaid correctly
+- Multiple detection methods are compared
+
+### Step 10: Review Output Data
+
+Check generated measurement data:
+
+```bash
+# View output files
+data/output/
+├── measurements.db                         # Main SQLite database
+├── measurements_20250829_102137.csv       # CSV export
+├── measurements_20250829_102137.json      # JSON export  
+└── measurements_20250829_102137.db        # Database backup
+```
+
+### Step 11: Run Cleanup (Optional)
+
+```bash
+# Run the automated cleanup script
+.\cleanup.bat
+
+# Or manually clean specific directories:
+# - Clean debug images (optional - useful for disk space)
+# - Reset processed image tracking (to reprocess same images) 
+# - Clean processed images directory
+```
+
+## Key Configuration Options
+
+**Force specific detection method while running all methods:**
+
+```yaml
+detection:
+  method: 'integrated'              # Always run all 4 methods
+  forced_method: 'enhanced_gradient' # But use this method's result
+  # Options: 'enhanced_gradient', 'edge', 'color', 'gradient', null
+```
+
+**Environment variables for testing:**
+
+```bash
+set DEBUG_MODE=true              # Enable debug images and detailed logging
+set USE_GUI_SELECTOR=true        # Enable folder selection GUI
+set CALIBRATION_MODE=true        # Run calibration mode
+set PROCESS_INTERVAL=60          # Processing interval in seconds
+```
+
+**Common troubleshooting:**
+
+- **Scale not detected:** Disable image resizing in config: `resize_width: null`
+- **Waterline inaccurate:** Use `forced_method: 'enhanced_gradient'` for clear water
+- **No images processed:** Check folder permissions and database path
+- **Calibration fails:** Ensure `data/calibration/calibration_image.jpg` exists
+
+This guide covers the essential workflow from setup to measurement results. For detailed configuration options, see the full documentation sections below.
+
 ## Quick Start
 
 ### Using Docker (Recommended)
