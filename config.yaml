@@ -94,12 +94,50 @@ detection:
   # Color-based detection (HSV ranges for water)
   water_hsv_lower: [78, 9, 98]
   water_hsv_upper: [108, 129, 218]
+  
+  # NEW: Pattern-aware detection system
+  pattern_aware:
+    enabled: false                    # Enable pattern-aware detection
+    engine: 'integrated_pattern'      # Pattern detection engine
+    fallback_to_standard: true        # Fall back to standard methods if pattern fails
+    
+    # Pattern recognition settings
+    template_matching:
+      enabled: true
+      threshold: 0.7                  # Template match confidence
+      max_templates: 10               # Maximum templates to store
+    
+    morphological:
+      enabled: true
+      horizontal_kernel_size: [40, 1] # Horizontal feature detection
+      vertical_kernel_size: [1, 40]   # Vertical feature suppression
+    
+    frequency_analysis:
+      enabled: true
+      periodicity_threshold: 0.3      # Max periodicity for water interface
+    
+    line_detection:
+      enabled: true
+      min_line_length_ratio: 0.6      # Minimum line length (% of scale width)
+      max_angle_deviation: 10         # Max angle from horizontal (degrees)
+    
+    contour_analysis:
+      enabled: true
+      min_aspect_ratio: 10            # Minimum width/height ratio
+      min_width_ratio: 0.5            # Minimum width (% of scale width)
 
 processing:
   # Image processing settings
   resize_width: null  # 800 # Use "null" to disable resizing & use original image dimensions
   save_processed_images: true
   image_format: 'jpg'
+
+# NEW: Pattern-aware processing mode
+pattern_processing:
+  mode: 'standard'                    # Options: 'standard', 'pattern_aware', 'hybrid'
+  debug_patterns: false               # Save pattern analysis debug images
+  save_templates: true                # Save extracted templates for reuse
+  template_directory: 'data/pattern_templates/scale_markings'
   
 output:
   # Output settings

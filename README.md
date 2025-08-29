@@ -88,6 +88,7 @@ python src/calibration/analyze_scale_photo.py
 ```
 
 **Follow the interactive prompts:**
+
 1. Enter actual scale readings (top and waterline positions)
 2. Click 4 scale corners (even if partially underwater)  
 3. Mark waterline position (left and right edges)
@@ -121,6 +122,7 @@ set CALIBRATION_MODE=false
 ```
 
 Or create a `.env` file:
+
 ```bash
 USE_GUI_SELECTOR=true
 DEBUG_MODE=true  
@@ -135,6 +137,7 @@ set CALIBRATION_MODE=true & python src/main.py
 ```
 
 **Calibration generates:**
+
 - `data/calibration/calibration.yaml` with precise pixel/cm ratio
 - Enhanced waterline reference data
 - Scale marking analysis (if available)
@@ -191,6 +194,7 @@ data/debug/debug_session_20250829_102135/
 ```
 
 **What to check in debug images:**
+
 - Scale boundaries are correctly detected (blue rectangles)
 - Waterline detection is accurate (green lines)
 - Final measurements are overlaid correctly
