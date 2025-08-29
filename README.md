@@ -1218,9 +1218,9 @@ We welcome contributions! Here's how to get started:
 
 This project is licensed under the BSD 3-Clause License. See [LICENSE](LICENSE) file for details.
 
-## Acknowledgments
+## 🔴 Acknowledgments
 
-This work incorporates ideas and code from several open-source projects:
+This work has used ideas from several open-source projects:
 
 - [**Object-Size-measurement-in-an-image-using-OpenCV4.0-and-imutils**](https://github.com/prateekralhan/Object-Size-measurement-in-an-image-using-openCV4.0-and-imutils) - MIT License
 - [**Object-Size-Measurement-Using-OpenCV**](https://github.com/khan-tahir/Object-Size-Measurement-Using-OpenCV) - MIT License
