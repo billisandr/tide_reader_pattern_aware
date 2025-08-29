@@ -151,7 +151,7 @@ def log_system_info(detection_system, config):
         logger.info(f"Save templates: {pattern_processing.get('save_templates', True)}")
 
 def main():
-    """Main entry point for pattern-aware detection system."""
+    """Main entry point for pattern-aware detection system.""" 
     try:
         # Setup logging
         debug_mode = os.environ.get('DEBUG_MODE', 'false').lower() == 'true'
