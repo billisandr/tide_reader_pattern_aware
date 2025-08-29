@@ -7,7 +7,7 @@ scale:
   # Scale position in image (if fixed)
   expected_position:
     x_min: 81
-    x_max: 188
+    x_max: 194
     y_min: 1
     y_max: 550
   
@@ -34,13 +34,13 @@ scale:
       blue:
         enabled: true
         hsv_lower: [94, 12, 155]
-        hsv_upper: [114, 112, 255]
+        hsv_upper: [114, 120, 255]
         description: "Blue scale background"
 
       black:
         enabled: true
         hsv_lower: [0, 0, 0]
-        hsv_upper: [179, 62, 88]
+        hsv_upper: [166, 72, 88]
         description: "Black scale markings"
       
       red:
@@ -83,12 +83,17 @@ detection:
   blur_kernel_size: 7
   min_contour_area: 500
   
-  # Water detection method: 'edge', 'color', 'gradient'
-  method: 'gradient'
+  # Water detection method: 'edge', 'color', 'gradient', 'integrated' (runs all methods)
+  method: 'integrated'
+  
+  # Force a specific method while still running all methods for comparison
+  # Options: 'enhanced_gradient', 'edge', 'color', 'gradient', null (use consensus)
+  # When set, this method will be used as final result, but all methods still run and log results
+  forced_method: 'enhanced_gradient'
   
   # Color-based detection (HSV ranges for water)
-  water_hsv_lower: [75, 11, 87]
-  water_hsv_upper: [105, 131, 207]
+  water_hsv_lower: [78, 9, 98]
+  water_hsv_upper: [108, 129, 218]
 
 processing:
   # Image processing settings

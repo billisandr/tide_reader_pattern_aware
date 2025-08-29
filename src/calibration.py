@@ -30,7 +30,7 @@ class CalibrationManager:
         return calib_data['pixels_per_cm']
     
     def get_enhanced_calibration_data(self):
-        """Load enhanced calibration data including waterline reference."""
+        """Load enhanced calibration data including waterline reference and gradient analysis."""
         if not self.is_calibrated():
             return None
         
@@ -43,13 +43,40 @@ class CalibrationManager:
             'method': calib_data.get('calibration_method', 'unknown'),
             'confidence': calib_data.get('confidence', 0.95),
             'waterline_reference': None,
-            'scale_measurements': None
+            'scale_measurements': None,
+            'waterline_gradient': None,
+            'scale_boundaries': None,
+            'scale_markings': None
         }
         
         # Check if this is enhanced waterline-aware calibration
         if calib_data.get('calibration_method') == 'enhanced_interactive_waterline':
             enhanced_data['waterline_reference'] = calib_data.get('reference_points', {}).get('waterline')
             enhanced_data['scale_measurements'] = calib_data.get('scale_measurements')
+            enhanced_data['scale_boundaries'] = calib_data.get('scale_boundaries')
+            
+            # Load critical waterline_gradient data for multi-color-space detection
+            waterline_gradient = calib_data.get('waterline_gradient')
+            if waterline_gradient:
+                enhanced_data['waterline_gradient'] = waterline_gradient
+                
+                # Load scale marking analysis data if available
+                scale_markings = waterline_gradient.get('scale_markings')
+                if scale_markings:
+                    enhanced_data['scale_markings'] = scale_markings
+                    self.logger.info("Loaded scale marking analysis data for artifact detection")
+                    self.logger.debug(f"Scale markings found: {scale_markings.get('marking_count', 0)}")
+                    self.logger.debug(f"Average marking brightness: {scale_markings.get('avg_marking_gray', 'N/A')}")
+                    self.logger.debug(f"Marking contrast threshold: {scale_markings.get('marking_contrast_threshold', 'N/A')}")
+                else:
+                    self.logger.warning("Enhanced calibration missing scale_markings data - artifact detection may be less accurate")
+                
+                self.logger.info("Loaded waterline gradient data for multi-color-space detection")
+                self.logger.debug(f"Above water gray mean: {waterline_gradient.get('above_water', {}).get('gray_mean', 'N/A')}")
+                self.logger.debug(f"Below water gray mean: {waterline_gradient.get('below_water', {}).get('gray_mean', 'N/A')}")
+            else:
+                self.logger.warning("Enhanced calibration missing waterline_gradient data - multi-color-space detection unavailable")
+            
             self.logger.info("Using enhanced waterline-aware calibration data")
         else:
             self.logger.info("Using standard calibration data (no waterline reference)")

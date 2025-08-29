@@ -8,6 +8,33 @@
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
 [![OpenCV](https://img.shields.io/badge/OpenCV-4.9%2B-green.svg)](https://opencv.org/)
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Features](#features)
+- [Quick Use Guide](#quick-use-guide)
+- [Quick Start](#quick-start)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Usage](#usage)
+  - [Enhanced Scale Configuration Analysis](#enhanced-scale-configuration-analysis)
+  - [Calibration System](#calibration-system)
+  - [Processing Images](#processing-images)
+  - [Visual Debugging](#visual-debugging)
+  - [Water Detection Methods](#water-detection-methods)
+  - [Scale Detection and Color Options](#scale-detection-and-color-options)
+- [Data Export Options](#data-export-options)
+- [Project Structure](#project-structure)
+- [Development](#development)
+- [Troubleshooting](#troubleshooting)
+- [Deployment Options](#deployment-options)
+- [Contributing](#contributing)
+- [Performance](#performance)
+- [Architecture](#architecture)
+- [License](#license)
+- [Acknowledgments](#acknowledgments)
+- [Support](#support)
+
 ## Overview
 
 This system provides automated water/tide level detection and measurement using computer vision techniques. Designed for fixed camera setups with calibrated measurement scales, it processes images continuously and stores precise measurements in a database.
@@ -197,6 +224,9 @@ calibration:
   pixels_per_cm: null
   # Reference water level for calibration (cm)
   reference_water_level: 50.0
+  # Use enhanced calibration data with waterline gradient analysis
+  use_enhanced_data: true
+  enhanced_data_path: 'data/calibration/calibration.yaml'
 
 detection:
   # Water line detection parameters
@@ -214,7 +244,7 @@ detection:
 
 processing:
   # Image processing settings
-  resize_width: null  # ⚠️ WARNING: Set to null to disable resizing (recommended)
+  resize_width: null  # WARNING: Set to null to disable resizing (recommended)
                       # If enabled (e.g., 800), scale coordinates may become incorrect
                       # Use enhanced calibration workflow to avoid coordinate mismatch
   save_processed_images: true
@@ -258,8 +288,8 @@ python src/calibration/analyze_scale_photo.py
 
 **The enhanced analysis tool provides:**
 
-- **🆕 Enhanced waterline detection**: Mark actual waterline position on scale for precise calibration
-- **🆕 Real measurement inputs**: Enter actual scale readings for accurate cm/pixel calculation
+- **Enhanced waterline detection**: Mark actual waterline position on scale for precise calibration
+- **Real measurement inputs**: Enter actual scale readings for accurate cm/pixel calculation
 - **Interactive scale boundary picker**: Click on full visible scale corners (even if partially underwater)
 - **Interactive color selection**: Click on scale background and marking colors (optional)
 - **Interactive water color sampling**: Click on water color for detection parameter calibration (optional)
@@ -267,23 +297,23 @@ python src/calibration/analyze_scale_photo.py
 - **Color analysis**: Analyzes selected scale and water colors for RGB/HSV detection setup
 - **Configuration suggestions**: Generates optimal config.yaml values with custom color ranges
 
-**🆕 Enhanced Analysis Workflow:**
+**Enhanced Analysis Workflow:**
 
 1. **Image display**: Shows calibration image window before requesting measurements
-2. **🆕 Scale measurement input**: Enter actual scale readings while viewing the image:
+2. **Scale measurement input**: Enter actual scale readings while viewing the image:
    - Enter scale reading at TOP of visible scale (e.g., 485 cm)
    - Enter scale reading at current WATERLINE position (e.g., 420 cm)
-3. **🆕 Scale boundary selection**: Click 4 corner points of FULL visible scale (top-left, top-right, bottom-left, bottom-right)
+3. **Scale boundary selection**: Click 4 corner points of FULL visible scale (top-left, top-right, bottom-left, bottom-right)
    - Select entire visible scale even if parts are underwater
-4. **🆕 Waterline marking**: Click 2 points on left and right edges of scale at waterline position
+4. **Waterline marking**: Click 2 points on left and right edges of scale at waterline position
 5. **Interactive color sampling** (optional): Click on scale background color, then on marking/text color
 6. **Interactive water sampling** (optional): Click on water color (if visible) for detection calibration
 7. **Automatic analysis**: Edge detection and color analysis
-8. **🆕 Waterline gradient analysis**: Advanced analysis of color differences above/below waterline
+8. **Waterline gradient analysis**: Advanced analysis of color differences above/below waterline
 9. **Enhanced config generation**: Provides ready-to-use config.yaml values plus accurate calibration data
-10. **🆕 Summary display**: Clear summary of suggested config.yaml changes at the end
+10. **Summary display**: Clear summary of suggested config.yaml changes at the end
 
-**🆕 Key Advantages of Enhanced Workflow:**
+**Key Advantages of Enhanced Workflow:**
 
 - **More Accurate Calibration**: Uses actual measured scale segment instead of estimated total height
 - **Waterline Aware**: Directly captures current water level during calibration
@@ -295,11 +325,11 @@ python src/calibration/analyze_scale_photo.py
 
 The system provides two integrated calibration workflows that work together to provide accurate water level measurements.
 
-#### Workflow 1: 🆕 Enhanced Interactive Analysis + Calibration (Recommended)
+#### Workflow 1: Enhanced Interactive Analysis + Calibration (Recommended)
 
 **Best for**: New setups, precise measurements, waterline-aware calibration, partially submerged scales
 
-**🆕 Enhanced Complete Process**:
+**Enhanced Complete Process**:
 
 ```bash
 # Step 1: Enhanced interactive scale analysis with waterline detection
@@ -323,7 +353,7 @@ set CALIBRATION_MODE=true & python src/main.py
 # → Ready for highly accurate water level detection
 ```
 
-**🆕 Enhanced Advantages**:
+**Enhanced Advantages**:
 
 - **Highest accuracy**: Uses actual scale measurements instead of estimates
 - **Waterline-aware**: Directly incorporates current water level into calibration
@@ -377,7 +407,7 @@ set CALIBRATION_MODE=true & python src/main.py
 - **Better error handling**: Improved numpy type conversion for YAML compatibility
 - **Enhanced summary display**: Clear config.yaml suggestions shown at end of calibration process
 
-**🆕 Enhanced generated calibration.yaml contains**:
+**Enhanced generated calibration.yaml contains**:
 
 ```yaml
 pixels_per_cm: 12.546                  # Precise conversion factor from real measurements
@@ -387,7 +417,7 @@ image_dimensions:                      # Image metadata
   width: 3024
   height: 4032
   resized: false
-scale_measurements:                    # 🆕 Actual scale readings
+scale_measurements:                    # Actual scale readings
   top_measurement_cm: 485.0           # Scale reading at top
   waterline_measurement_cm: 420.0     # Scale reading at waterline
   measurement_difference_cm: 65.0      # Actual measured difference
@@ -395,13 +425,13 @@ scale_measurements:                    # 🆕 Actual scale readings
 reference_points:                      # Enhanced reference points
   top_of_scale: {x: 75, y: 45}        # Top of scale boundary
   bottom_of_scale: {x: 190, y: 580}   # Bottom of scale boundary
-  waterline:                          # 🆕 Waterline position data
+  waterline:                          # Waterline position data
     x_left: 78
     y_left: 245
     x_right: 185
     y_right: 247
     y_average: 246
-scale_boundaries:                      # 🆕 Complete boundary data
+scale_boundaries:                      # Complete boundary data
   x_min: 75
   x_max: 190
   y_min: 45
@@ -417,7 +447,7 @@ notes: 'Generated by enhanced analyze_scale_photo.py with waterline detection...
 
 #### Method Selection Guide
 
-**🆕 Use Enhanced Interactive Analysis When**:
+**Use Enhanced Interactive Analysis When**:
 
 - Setting up system for first time
 - Scale is partially underwater/submerged
@@ -546,29 +576,84 @@ debug:
 
 ### Water Detection Methods
 
-The system provides three distinct water detection methods that can be selected in `config.yaml`:
+The system provides three distinct water detection methods with **enhanced multi-color-space analysis** for improved accuracy, especially for clear water scenarios:
 
 ```yaml
 detection:
-  method: 'edge'    # Options: 'edge', 'color', 'gradient'
+  method: 'gradient'  # Options: 'edge', 'color', 'gradient' (recommended for clear water)
 ```
+
+**Enhanced Detection Features (Latest Version):**
+
+- **Multi-Color-Space Analysis**: Analyzes water effects across RGB, HSV, LAB, and YUV color spaces
+- **Clear Water Optimization**: Specifically designed for clear water that darkens scale background
+- **Edge-Gradient Fusion**: Combines Sobel, Scharr, and Laplacian edge detection with gradient analysis
+- **Texture Variance Analysis**: Detects water's smoothing effect on surface texture
+- **Enhanced Calibration Integration**: Uses waterline reference data from interactive calibration
 
 **Method Selection Guide:**
 
-- **`edge`** (default): Best for clear water-air interfaces with good contrast
+- **`gradient`** **RECOMMENDED**: Best for clear water and enhanced accuracy
+  - **Multi-color-space gradient analysis** across 5 color spaces (RGB, HSV, LAB, YUV, Grayscale)
+  - **Clear water darkening detection** - identifies 10-40% brightness reduction patterns
+  - **Edge-based validation** using horizontal gradient analysis
+  - **Texture analysis** - detects water's smoothing effects
+  - **Enhanced calibration integration** - uses waterline reference data
+  - **High confidence scoring** based on multiple validation factors
+  - **Best for**: Clear water, subtle transitions, enhanced calibration setups
+
+- **`edge`**: Best for clear water-air interfaces with sharp contrast
   - Uses Canny edge detection with optional color enhancement
-  - Most reliable for typical water level detection scenarios
+  - Reliable for typical water level detection with strong boundaries
   - Works well with various lighting conditions
+  - **Best for**: Sharp water interfaces, good lighting
 
 - **`color`**: Best for colored water (algae, sediment, specific water conditions)
   - Uses HSV color ranges to identify water regions: `water_hsv_lower/upper`
   - Ideal when water has distinct color different from background
   - Configure HSV ranges using the analyze_scale_photo.py tool
+  - **Best for**: Distinctly colored water, non-clear water conditions
 
-- **`gradient`**: Best for subtle transitions and as fallback method
-  - Uses intensity gradient analysis to find water boundaries
-  - Useful when edge detection fails due to poor contrast
-  - Automatically used as fallback for other methods
+**Enhanced Gradient Method Details:**
+
+The enhanced gradient method uses a comprehensive **5-layer analysis system**:
+
+1. **Multi-Color-Space Consistency (35% weight)**:
+   - Grayscale brightness analysis
+   - HSV Value channel analysis  
+   - LAB Lightness analysis (perceptually accurate)
+   - YUV Luminance analysis
+   - Validates darkening patterns across all color spaces
+
+2. **BGR Channel Analysis (20% weight)**:
+   - Individual Blue, Green, Red channel analysis
+   - Compares with calibrated expected values
+   - Detects subtle color shifts per channel
+
+3. **Edge Gradient Validation (20% weight)**:
+   - Prioritizes horizontal gradients (waterline characteristic)
+   - Uses Sobel, Scharr, and Laplacian edge detection
+   - Validates transitions across multiple scales
+
+4. **Spatial Width Consistency (15% weight)**:
+   - Ensures uniform pattern across waterline width
+   - Samples multiple points along waterline
+   - Validates expected darkening consistency
+
+5. **Texture Variance Analysis (10% weight)**:
+   - Detects water's surface smoothing effects
+   - Analyzes texture changes above/below waterline
+   - Validates expected variance reduction patterns
+
+**Enhanced Calibration Integration:**
+
+When using enhanced calibration data (`use_enhanced_data: true`), the gradient method gains access to:
+
+- **Waterline reference position** for validation
+- **Expected darkening ratios** specific to your setup
+- **Above/below water color characteristics**
+- **Calibrated brightness differences** from real measurements
+- **95% base confidence** vs 80% for standard methods
 
 **Color-Based Water Detection Setup:**
 When using `method: 'color'`, configure the HSV ranges for your water:
@@ -782,21 +867,24 @@ The project follows standard Python conventions:
 - Check calibration file path in logs
 - Run enhanced calibration: `python src/calibration/analyze_scale_photo.py` then `set CALIBRATION_MODE=true & python src/main.py`
 
-**🆕 Scale detection completely missing/wrong:**
+**Scale detection completely missing/wrong:**
 
 - **Most likely cause**: Image resizing mismatch with hardcoded coordinates
 - **Immediate solution**: Disable resizing in config.yaml: `resize_width: null`
 - **Root cause**: When resizing is enabled, hardcoded scale coordinates become incorrect
-- **⚠️ Important**: Current system uses absolute pixel coordinates that don't scale properly
+- **Important**: Current system uses absolute pixel coordinates that don't scale properly
 - **Best practice**: Always disable resizing (`resize_width: null`) until relative coordinate system is implemented
 - **Workaround**: Run `python src/calibration/analyze_scale_photo.py` to get correct coordinates for your setup
 
-**🆕 Waterline detection inaccurate:**
+**Waterline detection inaccurate:**
 
+- **For clear water**: Use `method: 'gradient'` in config.yaml (recommended)
 - Use enhanced calibration workflow: `python src/calibration/analyze_scale_photo.py`
 - Mark waterline position during calibration for reference
 - Enter actual scale measurements for precise cm/pixel calculation
 - Ensure scale is properly outlined even if partially underwater
+- Enable enhanced calibration: `use_enhanced_data: true` in config.yaml
+- **Clear water optimization**: The enhanced gradient method specifically handles water that darkens scale background
 
 **No images being processed:**
 
@@ -804,7 +892,7 @@ The project follows standard Python conventions:
 - Check database path configuration
 - Clear database if paths have changed: `rm data/output/measurements.db`
 
-**🆕 Enhanced calibration tool not starting:**
+**Enhanced calibration tool not starting:**
 
 - Ensure display is available (not headless environment)
 - Check OpenCV GUI support: `python -c "import cv2; cv2.imshow('test', cv2.imread('image.jpg')); cv2.waitKey(1000)"`
@@ -939,7 +1027,7 @@ We welcome contributions! Here's how to get started:
 
 This project is licensed under the BSD 3-Clause License. See [LICENSE](LICENSE) file for details.
 
-## 🔴 Acknowledgments
+## Acknowledgments
 
 This work incorporates ideas and code from several open-source projects:
 
@@ -951,7 +1039,7 @@ This work incorporates ideas and code from several open-source projects:
 **Research Context:**
 This work is part of prototype research conducted at the [SenseLAB](http://senselab.tuc.gr/) of the [Technical University of Crete](https://www.tuc.gr/en/).
 
-## 🔴 Support
+## Support
 
 - **Issues**: Report bugs and request features via GitHub Issues
 - **Documentation**: Additional documentation in `/docs` directory

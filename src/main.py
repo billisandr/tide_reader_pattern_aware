@@ -102,7 +102,7 @@ def main():
     logger.info(f"Calibration method: {enhanced_calibration_data['method']}")
     
     # Initialize detector with enhanced calibration data
-    detector = WaterLevelDetector(config, pixels_per_cm, enhanced_calibration_data)
+    detector = WaterLevelDetector(config, pixels_per_cm, enhanced_calibration_data, calibration_manager)
     
     # Processing loop  
     process_interval = int(os.environ.get('PROCESS_INTERVAL', 60))

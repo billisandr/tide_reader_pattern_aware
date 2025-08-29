@@ -842,7 +842,155 @@ def analyze_waterline_color_gradient(image, waterline_points, scale_corners):
     cv2.waitKey(0)
     cv2.destroyAllWindows()
     
+    # Add scale marking analysis
+    print("\nAnalyzing scale markings for artifact detection...")
+    scale_marking_analysis = analyze_scale_markings(image, scale_corners, waterline_y, scale_mask)
+    detection_data['scale_markings'] = scale_marking_analysis
+    
+    if scale_marking_analysis and scale_marking_analysis['marking_count'] > 0:
+        print(f"Scale marking analysis complete:")
+        print(f"  - Found {scale_marking_analysis['marking_count']} marking regions")
+        print(f"  - Average marking brightness: {scale_marking_analysis['avg_marking_gray']:.1f}")
+        print(f"  - Average contrast ratio: {scale_marking_analysis['avg_contrast_ratio']:.2f}")
+        print(f"  - Background vs marking difference: {scale_marking_analysis['background_vs_marking_diff']:.1f}")
+    else:
+        print("No significant scale markings detected for analysis")
+    
     return detection_data
+
+def analyze_scale_markings(image, scale_corners, waterline_y, scale_mask):
+    """
+    Analyze scale markings (text, numbers, lines) to help distinguish them from water interfaces.
+    This helps the detection system avoid false positives from scale markings.
+    """
+    try:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        
+        # Get scale bounds
+        scale_left = int(np.min([pt[0] for pt in scale_corners]))
+        scale_right = int(np.max([pt[0] for pt in scale_corners]))
+        scale_top = int(np.min([pt[1] for pt in scale_corners]))
+        scale_bottom = int(np.max([pt[1] for pt in scale_corners]))
+        
+        # Extract scale region
+        scale_region = gray[scale_top:scale_bottom, scale_left:scale_right]
+        scale_region_mask = scale_mask[scale_top:scale_bottom, scale_left:scale_right]
+        
+        if scale_region.size == 0:
+            return None
+        
+        # Find dark regions that could be markings
+        # Scale markings are typically much darker than background
+        background_threshold = np.mean(scale_region[scale_region_mask > 0])
+        marking_threshold = background_threshold * 0.6  # 40% darker than background
+        
+        # Create binary mask for potential markings
+        marking_candidates = (scale_region < marking_threshold) & (scale_region_mask > 0)
+        
+        # Find connected components (individual markings)
+        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+            marking_candidates.astype(np.uint8), connectivity=8
+        )
+        
+        marking_regions = []
+        valid_markings = 0
+        total_marking_gray = 0
+        total_contrast_ratios = []
+        
+        # Analyze each potential marking
+        for i in range(1, num_labels):  # Skip background (label 0)
+            area = stats[i, cv2.CC_STAT_AREA]
+            width = stats[i, cv2.CC_STAT_WIDTH]
+            height = stats[i, cv2.CC_STAT_HEIGHT]
+            
+            # Filter out noise and very large regions
+            if area < 10 or area > (scale_region.size * 0.1):  # 10 pixels to 10% of scale
+                continue
+            
+            # Aspect ratio check - markings are often tall (text) or wide (lines)
+            aspect_ratio = max(width, height) / min(width, height)
+            if aspect_ratio < 1.5:  # Not elongated enough to be typical marking
+                continue
+            
+            # Extract marking region
+            x, y, w, h = stats[i, cv2.CC_STAT_LEFT:cv2.CC_STAT_LEFT+4]
+            marking_region = scale_region[y:y+h, x:x+w]
+            marking_mask = (labels[y:y+h, x:x+w] == i)
+            
+            if np.sum(marking_mask) == 0:
+                continue
+            
+            # Calculate marking characteristics
+            marking_pixels = marking_region[marking_mask]
+            avg_marking_gray = np.mean(marking_pixels)
+            
+            # Calculate local background around marking
+            expanded_y1 = max(0, y - 5)
+            expanded_y2 = min(scale_region.shape[0], y + h + 5)
+            expanded_x1 = max(0, x - 5) 
+            expanded_x2 = min(scale_region.shape[1], x + w + 5)
+            
+            local_region = scale_region[expanded_y1:expanded_y2, expanded_x1:expanded_x2]
+            local_mask = scale_region_mask[expanded_y1:expanded_y2, expanded_x1:expanded_x2] > 0
+            local_background = local_region[local_mask & (local_region > marking_threshold)]
+            
+            if len(local_background) > 0:
+                avg_background_gray = np.mean(local_background)
+                contrast_ratio = (avg_background_gray - avg_marking_gray) / avg_background_gray
+                
+                # Valid marking criteria
+                if contrast_ratio > 0.2 and avg_marking_gray < 120:  # 20%+ contrast, dark enough
+                    marking_regions.append({
+                        'x': x, 'y': y, 'width': w, 'height': h,
+                        'area': area, 'aspect_ratio': aspect_ratio,
+                        'avg_gray': avg_marking_gray,
+                        'background_gray': avg_background_gray,
+                        'contrast_ratio': contrast_ratio
+                    })
+                    
+                    valid_markings += 1
+                    total_marking_gray += avg_marking_gray
+                    total_contrast_ratios.append(contrast_ratio)
+        
+        # Calculate aggregate statistics
+        if valid_markings > 0:
+            avg_marking_gray = total_marking_gray / valid_markings
+            avg_contrast_ratio = np.mean(total_contrast_ratios)
+            background_vs_marking_diff = background_threshold - avg_marking_gray
+            
+            # Calculate typical marking characteristics for detection filtering
+            marking_darkness_threshold = avg_marking_gray + np.std([r['avg_gray'] for r in marking_regions])
+            marking_contrast_threshold = avg_contrast_ratio - np.std(total_contrast_ratios)
+            
+            return {
+                'marking_count': valid_markings,
+                'avg_marking_gray': avg_marking_gray,
+                'avg_contrast_ratio': avg_contrast_ratio,
+                'background_threshold': background_threshold,
+                'background_vs_marking_diff': background_vs_marking_diff,
+                'marking_darkness_threshold': marking_darkness_threshold,
+                'marking_contrast_threshold': max(marking_contrast_threshold, 0.3),  # Minimum 30%
+                'typical_saturation': 15.0,  # Scale markings typically have low saturation
+                'regions': marking_regions[:10]  # Keep up to 10 example regions
+            }
+        else:
+            # No markings found - return default thresholds
+            return {
+                'marking_count': 0,
+                'avg_marking_gray': 80.0,  # Default dark threshold
+                'avg_contrast_ratio': 0.4,  # Default high contrast
+                'background_threshold': background_threshold,
+                'background_vs_marking_diff': 50.0,  # Default difference
+                'marking_darkness_threshold': 80.0,
+                'marking_contrast_threshold': 0.4,
+                'typical_saturation': 15.0,
+                'regions': []
+            }
+    
+    except Exception as e:
+        print(f"Error in scale marking analysis: {e}")
+        return None
 
 def get_scale_measurements():
     """Get scale measurement inputs from user"""
