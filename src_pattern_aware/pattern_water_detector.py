@@ -75,9 +75,9 @@ class PatternWaterDetector:
         self.blur_kernel = config['detection']['blur_kernel_size']
         self.scale_height_cm = config['scale']['total_height']
         
-        # Initialize debug visualizer
+        # Initialize debug visualizer with pattern-aware session prefix
         debug_enabled = config.get('debug', {}).get('enabled', False) and self.debug_patterns
-        self.debug_viz = DebugVisualizer(config, enabled=debug_enabled)
+        self.debug_viz = DebugVisualizer(config, enabled=debug_enabled, session_prefix='pattern_aware')
         
         # Initialize pattern analysis components
         self.template_manager = TemplateManager(config)
@@ -86,9 +86,7 @@ class PatternWaterDetector:
         # Initialize detection methods
         self._initialize_detection_methods()
         
-        # Setup debug visualization if enabled
-        if self.debug_patterns:
-            self._setup_debug_visualization()
+        # Debug visualization is now handled by the DebugVisualizer class
         
         # Log configuration
         self._log_initialization()
@@ -126,17 +124,6 @@ class PatternWaterDetector:
         
         self.logger.info(f"Initialized {len(self.detection_methods)} pattern detection methods")
     
-    def _setup_debug_visualization(self):
-        """Setup debug visualization for pattern analysis."""
-        self.debug_dir = Path('data/debug/pattern_analysis')
-        self.debug_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Create session-specific debug directory
-        session_id = datetime.now().strftime('%Y%m%d_%H%M%S')
-        self.debug_session_dir = self.debug_dir / f'pattern_session_{session_id}'
-        self.debug_session_dir.mkdir(exist_ok=True)
-        
-        self.logger.info(f"Pattern debug visualization enabled: {self.debug_session_dir}")
     
     def _log_initialization(self):
         """Log initialization information."""
@@ -170,6 +157,9 @@ class PatternWaterDetector:
         Returns:
             dict: Processing results including water level and confidence
         """
+        import time
+        start_time = time.time()
+        
         try:
             # Load image
             image = cv2.imread(str(image_path))
@@ -258,13 +248,144 @@ class PatternWaterDetector:
             }
             
             self.logger.info(f"Pattern detection successful: {water_level_cm:.1f}cm")
+            
+            # Save annotated image if configured
+            processing_time = time.time() - start_time
+            if self.config['processing'].get('save_processed_images', True):
+                self.save_processed_image_enhanced(image, result, processing_time, image_path)
+                
             return result
             
         except Exception as e:
             self.logger.error(f"Error processing image {image_path}: {e}")
+            
+            # Save annotated image for failed detection if configured
+            processing_time = time.time() - start_time
+            if self.config['processing'].get('save_processed_images', True):
+                try:
+                    # Try to load image if not already loaded
+                    if 'image' not in locals() or image is None:
+                        image = cv2.imread(str(image_path))
+                    if image is not None:
+                        self.save_processed_image_enhanced(image, None, processing_time, image_path)
+                except:
+                    pass  # Don't let annotated image saving break the main flow
+            
             if self.fallback_enabled:
                 return self._fallback_to_standard_detection(image, image_path)
             return None
+    
+    def save_processed_image_enhanced(self, image, result, processing_time, image_path):
+        """
+        Save image with pattern-aware annotations showing detected water line and measurements.
+        Enhanced version that handles both successful and failed detections.
+        """
+        import cv2
+        from pathlib import Path
+        from datetime import datetime
+        
+        annotated = image.copy()
+        
+        # Draw annotations based on result
+        if result:
+            # Successful detection
+            water_line_y = result.get('water_line_y')
+            scale_bounds = result.get('scale_bounds', {})
+            
+            # Draw water line (green for success)
+            if water_line_y is not None:
+                cv2.line(annotated, (0, water_line_y), (image.shape[1], water_line_y), (0, 255, 0), 3)
+            
+            # Draw scale bounds
+            if scale_bounds:
+                x_min = scale_bounds.get('x_min', 0)
+                x_max = scale_bounds.get('x_max', image.shape[1])
+                y_min = scale_bounds.get('y_min', 0)
+                y_max = scale_bounds.get('y_max', image.shape[0])
+                
+                # Draw scale region rectangle
+                cv2.rectangle(annotated, (x_min, y_min), (x_max, y_max), (255, 0, 0), 2)
+            
+            # Add success text
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            y_offset = 30
+            
+            text = f"PATTERN-AWARE SUCCESS"
+            cv2.putText(annotated, text, (10, y_offset), font, 0.8, (0, 255, 0), 2)
+            y_offset += 35
+            
+            text = f"Water Level: {result['water_level_cm']:.1f}cm"
+            cv2.putText(annotated, text, (10, y_offset), font, 0.7, (0, 255, 0), 2)
+            y_offset += 30
+            
+            text = f"Scale Above Water: {result['scale_above_water_cm']:.1f}cm"
+            cv2.putText(annotated, text, (10, y_offset), font, 0.7, (255, 255, 0), 2)
+            y_offset += 30
+            
+            text = f"Engine: {result.get('pattern_engine', 'unknown')}"
+            cv2.putText(annotated, text, (10, y_offset), font, 0.6, (255, 255, 255), 1)
+            y_offset += 25
+            
+            text = f"Confidence: {result.get('confidence', 0.0):.2f}"
+            cv2.putText(annotated, text, (10, y_offset), font, 0.6, (255, 255, 255), 1)
+            y_offset += 25
+            
+        else:
+            # Failed detection
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            y_offset = 30
+            
+            text = "PATTERN DETECTION FAILED"
+            cv2.putText(annotated, text, (10, y_offset), font, 0.8, (0, 0, 255), 2)
+            y_offset += 35
+            
+            # Show attempted pattern engine
+            text = f"Engine attempted: {self.pattern_engine}"
+            cv2.putText(annotated, text, (10, y_offset), font, 0.6, (255, 255, 255), 1)
+            y_offset += 25
+            
+            # Show fallback status
+            if self.fallback_enabled:
+                text = "Fallback to standard detection: enabled"
+                cv2.putText(annotated, text, (10, y_offset), font, 0.6, (255, 255, 255), 1)
+            else:
+                text = "Fallback to standard detection: disabled"
+                cv2.putText(annotated, text, (10, y_offset), font, 0.6, (255, 255, 255), 1)
+            y_offset += 25
+        
+        # Add processing info (common for both success/failure)
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        y_pos = image.shape[0] - 60
+        
+        text = f"Processing time: {processing_time:.2f}s"
+        cv2.putText(annotated, text, (10, y_pos), font, 0.5, (200, 200, 200), 1)
+        y_pos += 20
+        
+        text = f"Pixels/cm: {self.pixels_per_cm:.2f}"
+        cv2.putText(annotated, text, (10, y_pos), font, 0.5, (200, 200, 200), 1)
+        y_pos += 20
+        
+        text = f"Pattern-aware detection system"
+        cv2.putText(annotated, text, (10, y_pos), font, 0.5, (200, 200, 200), 1)
+        
+        # Save annotated image
+        image_format = self.config['processing'].get('image_format', 'jpg')
+        if not image_format.startswith('.'):
+            image_format = '.' + image_format
+        
+        # Use output directory for annotated images
+        annotated_dir = Path('data/output/annotated')
+        annotated_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Include success/failure status in filename
+        status = "success" if result else "failed"
+        output_path = annotated_dir / f"annotated_pattern_{status}_{datetime.now().strftime('%Y%m%d_%H%M%S')}{image_format}"
+        success = cv2.imwrite(str(output_path), annotated)
+        
+        if success:
+            self.logger.debug(f"Saved pattern-aware annotated image: {output_path}")
+        else:
+            self.logger.warning(f"Failed to save pattern-aware annotated image: {output_path}")
     
     def _extract_scale_region(self, image):
         """Extract scale region using existing calibration data."""

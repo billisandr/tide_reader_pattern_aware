@@ -73,3 +73,6 @@ documentation/
 
 # Pattern-aware documentation
 src_pattern_aware/CUSTOM_TEMPLATES_GUIDE.md
+
+# Issues and future work documentation
+ISSUES_AND_FUTURE_WORK.md

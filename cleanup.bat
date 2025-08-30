@@ -20,4 +20,3 @@ for %%d in (%directories%) do (
 echo.
 echo Cleanup completed! Ready for fresh testing.
 echo Note: Input and calibration directories were preserved.
-pause

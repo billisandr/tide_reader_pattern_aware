@@ -210,7 +210,35 @@ data/output/
 ├── measurements.db                         # Main SQLite database
 ├── measurements_20250829_102137.csv       # CSV export
 ├── measurements_20250829_102137.json      # JSON export  
-└── measurements_20250829_102137.db        # Database backup
+├── measurements_20250829_102137.db        # Database backup
+└── annotated/                              # Visual output images
+    ├── annotated_success_20250829_102140.jpg    # Successful detection
+    ├── annotated_failed_20250829_102142.jpg     # Failed detection (diagnostic)
+    └── annotated_success_20250829_102145.jpg    # Another successful detection
+```
+
+#### Understanding Annotated Images
+
+**Important**: Annotated images are created for ALL processed images, not just successful detections:
+
+- **Success Images** (`annotated_success_*.jpg`): Show successful water level detection with:
+  - Green water line overlay
+  - Blue scale boundary lines  
+  - Measurement text (water level, scale above water)
+  - Processing time and calibration info
+
+- **Failed Images** (`annotated_failed_*.jpg`): Show diagnostic information for failed detections:
+  - Red water line (if detected) or "No water line detected"
+  - Blue scale boundaries (if detected) or "Scale bounds not detected" 
+  - "DETECTION FAILED" status text
+  - Processing diagnostics to help troubleshoot issues
+
+**Key Point**: Even if some images fail detection, you'll still get annotated output showing what was attempted. This helps debug why certain images couldn't be processed successfully.
+
+**Configuration**: Enable/disable annotated image creation in `config.yaml`:
+```yaml
+processing:
+  save_processed_images: true  # Set to false to disable annotated images
 ```
 
 ### Step 11: Run Cleanup (Optional)
@@ -1080,6 +1108,20 @@ The project follows standard Python conventions:
 - Ensure scale is properly outlined even if partially underwater
 - Enable enhanced calibration: `use_enhanced_data: true` in config.yaml
 - **Clear water optimization**: The enhanced gradient method specifically handles water that darkens scale background
+
+**Missing annotated images (fewer than expected):**
+
+- **Symptom**: All images show in debug session, but only some have annotated images in `data/output/annotated/`
+- **Root cause**: Previous versions only created annotated images for 100% successful detections
+- **What this means**: 
+  - If scale detection OR water line detection failed → no annotated image created
+  - Even partial success (e.g., found scale but no water line) → no annotated image
+  - Debug images still created for all processed images regardless of success/failure
+- **Solution**: Updated system now creates annotated images for ALL processed images:
+  - `annotated_success_*.jpg` for successful detections (green lines, measurements)
+  - `annotated_failed_*.jpg` for failed detections (red lines, diagnostic info)
+- **Configuration**: Ensure `processing.save_processed_images: true` in config.yaml
+- **Benefit**: You can now see what went wrong with failed detections instead of getting no visual feedback
 
 **No images being processed:**
 

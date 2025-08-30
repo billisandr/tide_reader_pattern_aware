@@ -10,6 +10,7 @@ import sys
 import logging
 import yaml
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Add src directory to path for imports
 project_root = Path(__file__).parent.parent
@@ -251,9 +252,27 @@ def run_pattern_aware_main(detection_system, config):
                                 confidence=result.get('confidence', 0.0)
                             )
                             
-                            # Move to processed directory
+                            # Move to processed directory (or copy if DEBUG_MODE)
                             processed_path = processed_dir / image_path.name
-                            image_path.rename(processed_path)
+                            debug_mode_env = os.environ.get('DEBUG_MODE', 'not_set')
+                            debug_mode = debug_mode_env.lower() == 'true'
+                            
+                            logger.debug(f"File operation for {image_path.name}: DEBUG_MODE='{debug_mode_env}', active={debug_mode}")
+                            
+                            if debug_mode:
+                                # Copy instead of move in debug mode to preserve originals
+                                import shutil
+                                shutil.copy2(str(image_path), str(processed_path))
+                                logger.info(f"PATTERN_AWARE DEBUG_MODE: Copied {image_path.name} to processed (original preserved in {image_path.parent})")
+                                # Verify original still exists
+                                if image_path.exists():
+                                    logger.debug(f"Verified: Original {image_path.name} still exists in input")
+                                else:
+                                    logger.error(f"ERROR: Original {image_path.name} was unexpectedly deleted!")
+                            else:
+                                # Normal mode: move the file
+                                logger.debug(f"Normal mode: Moving {image_path.name} from input to processed")
+                                image_path.rename(processed_path)
                             
                             logger.info(f"Processed {image_path.name}: "
                                       f"Water level = {result['water_level_cm']:.1f}cm "
@@ -289,13 +308,21 @@ def run_pattern_aware_main(detection_system, config):
 def main():
     """Main entry point for pattern-aware detection system.""" 
     try:
+        # Load environment variables from .env file
+        load_dotenv()
+        
         # Setup logging
-        debug_mode = os.environ.get('DEBUG_MODE', 'false').lower() == 'true'
+        debug_mode_env = os.environ.get('DEBUG_MODE', 'not_set')
+        debug_mode = debug_mode_env.lower() == 'true'
         log_level = logging.DEBUG if debug_mode else logging.INFO
         setup_logging(log_level)
         
         logger = logging.getLogger(__name__)
         logger.info("Starting Pattern-Aware Water Level Detection System")
+        
+        # Debug: Log DEBUG_MODE status at startup
+        logger.info(f"DEBUG_MODE environment variable: '{debug_mode_env}'")
+        logger.info(f"DEBUG_MODE active: {debug_mode}")
         
         # Load configuration
         config = load_config()

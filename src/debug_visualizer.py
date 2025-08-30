@@ -12,9 +12,10 @@ from datetime import datetime
 
 
 class DebugVisualizer:
-    def __init__(self, config, enabled=False):
+    def __init__(self, config, enabled=False, session_prefix='standard'):
         self.config = config
         self.enabled = enabled
+        self.session_prefix = session_prefix
         self.logger = logging.getLogger(__name__)
         self.debug_config = config.get('debug', {})
         
@@ -25,11 +26,21 @@ class DebugVisualizer:
         self.thickness = self.debug_config.get('annotation_thickness', 2)
         self.font_scale = self.debug_config.get('font_scale', 0.7)
         self.font = cv2.FONT_HERSHEY_SIMPLEX
-        self.steps_to_save = set(self.debug_config.get('steps_to_save', []))
+        
+        # Filter steps based on detector type
+        all_steps = set(self.debug_config.get('steps_to_save', []))
+        if session_prefix == 'standard':
+            # Exclude pattern-specific steps for standard detector
+            pattern_steps = {step for step in all_steps if step.startswith('pattern_')}
+            self.steps_to_save = all_steps - pattern_steps
+        else:
+            self.steps_to_save = all_steps
         
         # Current session info
         self.current_image_name = None
         self.session_dir = None
+        self.created_step_dirs = set()  # Track which step directories have been created
+        self.saved_images_count = 0     # Track number of images saved to prevent empty sessions
         
         if self.enabled and self.save_images:
             self.setup_debug_directory()
@@ -37,12 +48,12 @@ class DebugVisualizer:
     def setup_debug_directory(self):
         """Create debug output directory structure."""
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        self.session_dir = self.output_dir / f"debug_session_{timestamp}"
+        session_name = f"{self.session_prefix}_debug_session_{timestamp}" if self.session_prefix != 'standard' else f"debug_session_{timestamp}"
+        self.session_dir = self.output_dir / session_name
         self.session_dir.mkdir(parents=True, exist_ok=True)
         
-        # Create step subdirectories
-        for step in self.steps_to_save:
-            (self.session_dir / step).mkdir(exist_ok=True)
+        # Don't create step subdirectories yet - create them only when needed
+        # This prevents empty folders from being left behind
         
         self.logger.info(f"Debug session directory: {self.session_dir}")
     
@@ -71,6 +82,12 @@ class DebugVisualizer:
             self.logger.warning(f"Cannot save debug image for step '{step_name}': image is None")
             return
         
+        # Create step directory only when needed
+        step_dir = self.session_dir / step_name
+        if step_name not in self.created_step_dirs:
+            step_dir.mkdir(exist_ok=True)
+            self.created_step_dirs.add(step_name)
+        
         # Create a copy for annotation
         debug_image = image.copy()
         
@@ -91,10 +108,11 @@ class DebugVisualizer:
         
         # Save image
         filename = f"{self.current_image_name}_{step_name}.jpg"
-        output_path = self.session_dir / step_name / filename
+        output_path = step_dir / filename
         
         success = cv2.imwrite(str(output_path), debug_image)
         if success:
+            self.saved_images_count += 1
             self.logger.debug(f"Saved debug image: {output_path}")
         else:
             self.logger.error(f"Failed to save debug image: {output_path}")
@@ -216,7 +234,8 @@ class DebugVisualizer:
         canvas = np.zeros((600, 800, 3), dtype=np.uint8)
         
         # Add title
-        cv2.putText(canvas, f"Water Level Detection Summary", (50, 50),
+        title_text = f"{self.session_prefix.title()} Water Level Detection Summary"
+        cv2.putText(canvas, title_text, (50, 50),
                    self.font, 0.8, (255, 255, 255), 2, cv2.LINE_AA)
         
         # Add measurement results
@@ -227,7 +246,8 @@ class DebugVisualizer:
                 f"Water Level: {results.get('water_level_cm', 'N/A')} cm",
                 f"Scale Above Water: {results.get('scale_above_water_cm', 'N/A')} cm",
                 f"Confidence: {results.get('confidence', 'N/A')}",
-                f"Processing Time: {results.get('processing_time', 'N/A')} seconds"
+                f"Processing Time: {results.get('processing_time', 'N/A')} seconds",
+                f"Detection Method: {results.get('detection_method', 'N/A')}"
             ]
             
             for line in info_lines:
@@ -238,9 +258,31 @@ class DebugVisualizer:
         # Save summary
         filename = f"{self.current_image_name}_summary.jpg"
         output_path = self.session_dir / filename
-        cv2.imwrite(str(output_path), canvas)
+        success = cv2.imwrite(str(output_path), canvas)
         
-        self.logger.debug(f"Saved summary image: {output_path}")
+        if success:
+            self.saved_images_count += 1
+            self.logger.debug(f"Saved summary image: {output_path}")
+    
+    def cleanup_session(self):
+        """Clean up the debug session, removing empty directories if no images were saved."""
+        if not self.enabled or not self.session_dir:
+            return
+        
+        # If no images were saved, remove the entire session directory
+        if self.saved_images_count == 0:
+            try:
+                import shutil
+                shutil.rmtree(str(self.session_dir))
+                self.logger.debug(f"Removed empty debug session directory: {self.session_dir}")
+            except Exception as e:
+                self.logger.warning(f"Could not remove empty debug session directory: {e}")
+        else:
+            self.logger.info(f"Debug session completed with {self.saved_images_count} images saved: {self.session_dir}")
+    
+    def __del__(self):
+        """Cleanup when the object is destroyed."""
+        self.cleanup_session()
     
     def is_enabled(self):
         """Check if debug mode is enabled."""

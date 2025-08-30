@@ -485,6 +485,16 @@ python src_pattern_aware/main_pattern_aware.py
 
 All output formats (CSV, JSON, database) remain the same.
 
+#### Annotated Images Output
+
+Pattern-aware detection creates annotated images in `data/debug_pattern_aware/` showing visual results:
+
+- **Success Images**: Green water lines with pattern detection overlays
+- **Failed Images**: Red diagnostic overlays showing what pattern methods were attempted  
+- **Pattern Analysis**: Shows template matches, morphological analysis, frequency analysis results
+
+Unlike debug images (which show processing steps), annotated images provide final visual summaries suitable for documentation and verification.
+
 ### Template Extraction
 
 #### Interactive E-Template Extractor (Recommended)

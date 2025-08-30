@@ -1893,6 +1893,10 @@ class WaterLevelDetector:
                 water_line_y, scale_top_y, scale_bottom_y
             )
             
+            # Always save processed image if configured (even for failed detection)
+            if self.config['processing']['save_processed_images']:
+                self.save_processed_image_enhanced(image, result, water_line_y, scale_top_y, scale_bottom_y, adjusted_pixels_per_cm, time.time() - start_time, image_path)
+            
             if result:
                 # Add metadata
                 result['timestamp'] = datetime.now()
@@ -1954,10 +1958,6 @@ class WaterLevelDetector:
                 # Create summary image
                 self.debug_viz.create_summary_image(result)
                 
-                # Save processed image if configured
-                if self.config['processing']['save_processed_images']:
-                    self.save_processed_image(image, result)
-                
                 return result
             else:
                 self.logger.warning(f"Could not calculate water level for {image_path}")
@@ -1984,8 +1984,97 @@ class WaterLevelDetector:
         
         return confidence
     
+    def save_processed_image_enhanced(self, image, result, water_line_y, scale_top_y, scale_bottom_y, adjusted_pixels_per_cm, processing_time, image_path):
+        """
+        Save image with annotations showing detected water line and measurements.
+        Enhanced version that handles both successful and failed detections.
+        """
+        annotated = image.copy()
+        
+        # Draw water line (green if successful, red if failed)
+        if water_line_y is not None:
+            color = (0, 255, 0) if result else (0, 0, 255)  # Green for success, red for failure
+            cv2.line(annotated, 
+                    (0, water_line_y), 
+                    (image.shape[1], water_line_y),
+                    color, 2)
+        
+        # Draw scale bounds if detected
+        if scale_top_y is not None and scale_bottom_y is not None:
+            # Draw horizontal lines for scale bounds
+            cv2.line(annotated, (0, scale_top_y), (image.shape[1], scale_top_y), (255, 0, 0), 2)  # Blue for scale top
+            cv2.line(annotated, (0, scale_bottom_y), (image.shape[1], scale_bottom_y), (255, 0, 0), 2)  # Blue for scale bottom
+        
+        # Add text with measurements or error information
+        y_offset = 30
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.7
+        
+        if result:
+            # Successful detection
+            text = f"Water Level: {result['water_level_cm']:.1f}cm"
+            cv2.putText(annotated, text, (10, y_offset), font, font_scale, (0, 255, 0), 2)
+            y_offset += 30
+            
+            text = f"Scale Above Water: {result['scale_above_water_cm']:.1f}cm"
+            cv2.putText(annotated, text, (10, y_offset), font, font_scale, (255, 255, 0), 2)
+            y_offset += 30
+        else:
+            # Failed detection - show what was attempted
+            status_text = "DETECTION FAILED"
+            cv2.putText(annotated, status_text, (10, y_offset), font, font_scale, (0, 0, 255), 2)
+            y_offset += 30
+            
+            # Show what was detected/attempted
+            if water_line_y is not None:
+                text = f"Water line detected at Y={water_line_y}"
+                cv2.putText(annotated, text, (10, y_offset), font, font_scale*0.8, (255, 255, 255), 1)
+                y_offset += 25
+            else:
+                text = "No water line detected"
+                cv2.putText(annotated, text, (10, y_offset), font, font_scale*0.8, (255, 255, 255), 1)
+                y_offset += 25
+                
+            if scale_top_y is not None and scale_bottom_y is not None:
+                text = f"Scale bounds: {scale_top_y}-{scale_bottom_y}"
+                cv2.putText(annotated, text, (10, y_offset), font, font_scale*0.8, (255, 255, 255), 1)
+                y_offset += 25
+            else:
+                text = "Scale bounds not detected"
+                cv2.putText(annotated, text, (10, y_offset), font, font_scale*0.8, (255, 255, 255), 1)
+                y_offset += 25
+        
+        # Add processing info
+        text = f"Processing time: {processing_time:.2f}s"
+        cv2.putText(annotated, text, (10, y_offset), font, font_scale*0.6, (200, 200, 200), 1)
+        y_offset += 20
+        
+        text = f"Pixels/cm: {adjusted_pixels_per_cm:.2f}"
+        cv2.putText(annotated, text, (10, y_offset), font, font_scale*0.6, (200, 200, 200), 1)
+        
+        # Save annotated image using configured format
+        image_format = self.config['processing'].get('image_format', 'jpg')
+        # Ensure format starts with dot
+        if not image_format.startswith('.'):
+            image_format = '.' + image_format
+        
+        # Use output directory for annotated images (not processed directory)
+        annotated_dir = Path('data/output/annotated')
+        annotated_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Include success/failure status in filename
+        status = "success" if result else "failed"
+        output_path = annotated_dir / f"annotated_{status}_{datetime.now().strftime('%Y%m%d_%H%M%S')}{image_format}"
+        success = cv2.imwrite(str(output_path), annotated)
+        
+        if success:
+            self.logger.debug(f"Saved processed image: {output_path}")
+        else:
+            self.logger.warning(f"Failed to save processed image: {output_path}")
+
     def save_processed_image(self, image, result):
         """
+        Legacy method - kept for backwards compatibility.
         Save image with annotations showing detected water line and measurements.
         """
         annotated = image.copy()
@@ -2015,11 +2104,11 @@ class WaterLevelDetector:
         if not image_format.startswith('.'):
             image_format = '.' + image_format
         
-        # Use relative path with proper directory creation
-        processed_dir = Path('data/processed')
-        processed_dir.mkdir(parents=True, exist_ok=True)
+        # Use output directory for annotated images (not processed directory)
+        annotated_dir = Path('data/output/annotated')
+        annotated_dir.mkdir(parents=True, exist_ok=True)
         
-        output_path = processed_dir / f"annotated_{datetime.now().strftime('%Y%m%d_%H%M%S')}{image_format}"
+        output_path = annotated_dir / f"annotated_{datetime.now().strftime('%Y%m%d_%H%M%S')}{image_format}"
         success = cv2.imwrite(str(output_path), annotated)
         
         if success:

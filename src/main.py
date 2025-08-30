@@ -43,6 +43,12 @@ def main():
     setup_logging(logging.DEBUG)  # Enable debug logging
     logger = logging.getLogger(__name__)
     
+    # Debug: Log DEBUG_MODE status at startup
+    debug_mode_env = os.environ.get('DEBUG_MODE', 'not_set')
+    logger.info(f"DEBUG_MODE environment variable: '{debug_mode_env}'")
+    debug_mode_active = debug_mode_env.lower() == 'true'
+    logger.info(f"DEBUG_MODE active: {debug_mode_active}")
+    
     # Ask user to specify the input photos directory
     logger.info(f"USE_GUI_SELECTOR environment variable: {os.environ.get('USE_GUI_SELECTOR', 'not set')}")
     
@@ -149,9 +155,27 @@ def main():
                                 confidence=result.get('confidence', 0.0)
                             )
                             
-                            # Move to processed directory
+                            # Move to processed directory (or copy if DEBUG_MODE)
                             processed_path = processed_dir / image_path.name
-                            image_path.rename(processed_path)
+                            debug_mode_env = os.environ.get('DEBUG_MODE', 'not_set')
+                            debug_mode = debug_mode_env.lower() == 'true'
+                            
+                            logger.debug(f"File operation for {image_path.name}: DEBUG_MODE='{debug_mode_env}', active={debug_mode}")
+                            
+                            if debug_mode:
+                                # Copy instead of move in debug mode to preserve originals
+                                import shutil
+                                shutil.copy2(str(image_path), str(processed_path))
+                                logger.info(f"DEBUG_MODE: Copied {image_path.name} to processed (original preserved in {image_path.parent})")
+                                # Verify original still exists
+                                if image_path.exists():
+                                    logger.debug(f"Verified: Original {image_path.name} still exists in input")
+                                else:
+                                    logger.error(f"ERROR: Original {image_path.name} was unexpectedly deleted!")
+                            else:
+                                # Normal mode: move the file
+                                logger.debug(f"Normal mode: Moving {image_path.name} from input to processed")
+                                image_path.rename(processed_path)
                             
                             logger.info(f"Processed {image_path.name}: "
                                       f"Water level = {result['water_level_cm']:.1f}cm")

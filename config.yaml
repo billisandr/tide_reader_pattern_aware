@@ -175,6 +175,7 @@ debug:
   annotation_thickness: 2
   font_scale: 0.7
   steps_to_save:
+      # Standard detection debugging steps (used by both standard and pattern-aware detectors)
       - 'original'
       - 'preprocessed'
       - 'color_mask_blue'           # NEW - see blue color detection
@@ -190,7 +191,9 @@ debug:
       - 'scale_detection'
       - 'water_detection'
       - 'final_result'
-      # Pattern-aware debugging steps
+      
+      # Pattern-aware specific debugging steps (filtered out for standard detector)
+      # These are only used when pattern-aware detection is enabled
       - 'pattern_original'          # Original image for pattern processing
       - 'pattern_scale_region'      # Extracted scale region for pattern analysis
       - 'pattern_preprocessing'     # Scale region preprocessed for pattern detection
