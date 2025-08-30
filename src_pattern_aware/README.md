@@ -485,10 +485,21 @@ python src_pattern_aware/main_pattern_aware.py
 
 All output formats (CSV, JSON, database) remain the same.
 
-### Template Learning (PLANNED)
+### Template Extraction
+
+#### Interactive E-Template Extractor (Recommended)
+Extract E-shaped templates interactively with visual feedback:
 
 ```bash
-# Extract templates from calibration image (FUTURE)
+cd src_pattern_aware
+python interactive_template_extractor.py
+```
+
+This tool extracts black and white E-shaped templates (5cm markings) with immediate visual feedback.
+
+#### Programmatic Template Extraction
+```bash
+# Extract templates from calibration image
 python -c "
 from src_pattern_aware.pattern_water_detector import PatternWaterDetector
 detector = PatternWaterDetector(config, pixels_per_cm, calib_data)

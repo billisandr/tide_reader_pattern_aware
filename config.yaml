@@ -106,7 +106,7 @@ detection:
       enabled: true
       threshold: 0.7                  # Template match confidence
       max_templates: 10               # Maximum templates to store
-      template_source: 'local'        # Options: 'local', 'manager', 'both'
+      template_source: 'manager'        # Options: 'local', 'manager', 'both'
       use_default_templates: true     # Create default stadia rod templates
       
       # Advanced template matching settings

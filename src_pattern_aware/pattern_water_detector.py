@@ -12,20 +12,35 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-# Import debug visualizer
-from .debug_visualizer import DebugVisualizer
+# Import debug visualizer - handle both relative and absolute imports
+try:
+    from .debug_visualizer import DebugVisualizer
+except ImportError:
+    from debug_visualizer import DebugVisualizer
 
-# Import detection methods
-from .detection_methods.template_matching import TemplateMatchingDetector
-from .detection_methods.morphological_detector import MorphologicalDetector
-from .detection_methods.frequency_analyzer import FrequencyAnalyzer
-from .detection_methods.lsd_detector import LSDDetector
-from .detection_methods.contour_analyzer import ContourAnalyzer
-from .detection_methods.integrated_detector import IntegratedPatternDetector
+# Import detection methods - handle both relative and absolute imports
+try:
+    from .detection_methods.template_matching import TemplateMatchingDetector
+    from .detection_methods.morphological_detector import MorphologicalDetector
+    from .detection_methods.frequency_analyzer import FrequencyAnalyzer
+    from .detection_methods.lsd_detector import LSDDetector
+    from .detection_methods.contour_analyzer import ContourAnalyzer
+    from .detection_methods.integrated_detector import IntegratedPatternDetector
+except ImportError:
+    from detection_methods.template_matching import TemplateMatchingDetector
+    from detection_methods.morphological_detector import MorphologicalDetector
+    from detection_methods.frequency_analyzer import FrequencyAnalyzer
+    from detection_methods.lsd_detector import LSDDetector
+    from detection_methods.contour_analyzer import ContourAnalyzer
+    from detection_methods.integrated_detector import IntegratedPatternDetector
 
-# Import pattern analysis utilities
-from .pattern_analysis.template_manager import TemplateManager
-from .pattern_analysis.pattern_classifier import PatternClassifier
+# Import pattern analysis utilities - handle both relative and absolute imports
+try:
+    from .pattern_analysis.template_manager import TemplateManager
+    from .pattern_analysis.pattern_classifier import PatternClassifier
+except ImportError:
+    from pattern_analysis.template_manager import TemplateManager
+    from pattern_analysis.pattern_classifier import PatternClassifier
 
 class PatternWaterDetector:
     """
