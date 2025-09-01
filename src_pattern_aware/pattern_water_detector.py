@@ -119,7 +119,7 @@ class PatternWaterDetector:
         
         # Integrated Pattern Detector (combines all methods)
         self.integrated_detector = IntegratedPatternDetector(
-            self.config, self.detection_methods, self.pattern_classifier, self.debug_viz
+            self.config, self.detection_methods, self.pattern_classifier, self.debug_viz, self.enhanced_calibration_data
         )
         
         self.logger.info(f"Initialized {len(self.detection_methods)} pattern detection methods")

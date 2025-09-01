@@ -104,16 +104,16 @@ detection:
     # E-pattern sequential detection settings
     e_pattern_detection:
       enabled: true                   # Enable E-pattern sequential detector
-      #pixel_per_cm_tolerance: 0.30     # 30% tolerance for pixel/cm validation (more relaxed)
+      pixel_per_cm_tolerance: 0.4     # 30% tolerance for pixel/cm validation (more relaxed)
       single_e_cm: 5.0                # E_pattern_black/white correspond to 5 cm
-      match_threshold: 0.75         # Template matching threshold for E-patterns
-      max_consecutive_failures: 5    # Stop after N failures (likely reached water)
+      match_threshold: 0.4            # Template matching threshold for E-patterns (very relaxed for debugging)
+      max_consecutive_failures: 10    # Stop after N failures (likely reached water)
       support_flipped: true           # Support 180-degree flipped patterns
     
     # Pattern recognition settings
     template_matching:
       enabled: true
-      threshold: 0.75                  # Template match confidence
+      threshold: 0.7                  # Template match confidence
       max_templates: 10               # Maximum templates to store
       template_source: 'manager'        # Options: 'local', 'manager', 'both'
       use_default_templates: true     # Create default stadia rod templates

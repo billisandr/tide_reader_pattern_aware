@@ -229,13 +229,14 @@ data/output/
 
 - **Failed Images** (`annotated_failed_*.jpg`): Show diagnostic information for failed detections:
   - Red water line (if detected) or "No water line detected"
-  - Blue scale boundaries (if detected) or "Scale bounds not detected" 
+  - Blue scale boundaries (if detected) or "Scale bounds not detected"
   - "DETECTION FAILED" status text
   - Processing diagnostics to help troubleshoot issues
 
 **Key Point**: Even if some images fail detection, you'll still get annotated output showing what was attempted. This helps debug why certain images couldn't be processed successfully.
 
 **Configuration**: Enable/disable annotated image creation in `config.yaml`:
+
 ```yaml
 processing:
   save_processed_images: true  # Set to false to disable annotated images
@@ -1113,7 +1114,7 @@ The project follows standard Python conventions:
 
 - **Symptom**: All images show in debug session, but only some have annotated images in `data/output/annotated/`
 - **Root cause**: Previous versions only created annotated images for 100% successful detections
-- **What this means**: 
+- **What this means**:
   - If scale detection OR water line detection failed → no annotated image created
   - Even partial success (e.g., found scale but no water line) → no annotated image
   - Debug images still created for all processed images regardless of success/failure

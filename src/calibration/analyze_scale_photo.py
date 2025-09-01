@@ -1142,7 +1142,7 @@ def generate_calibration_data_enhanced(image, result_data, top_measurement=None,
         calib_data['waterline_gradient'] = waterline_gradient_data
         print("Waterline gradient data added to calibration")
     else:
-        print("⚠ No waterline gradient data available")
+        print("[WARNING] No waterline gradient data available")
     
     return calib_data
 
