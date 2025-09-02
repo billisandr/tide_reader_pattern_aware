@@ -575,6 +575,21 @@ class WaterLevelDetector:
             ]
         )
         
+        # Also save as scale_detection for compatibility with original method naming
+        scale_rect_annotations = {
+            'rectangles': [{
+                'x': scale_x_min, 'y': scale_top_y,
+                'w': scale_x_max - scale_x_min, 'h': scale_bottom_y - scale_top_y,
+                'color': (255, 0, 0),  # Blue
+                'label': 'Scale Region'
+            }]
+        }
+        self.debug_viz.save_debug_image(
+            image, 'scale_detection',
+            annotations=scale_rect_annotations,
+            info_text=f"Scale region: bounds=[{scale_x_min},{scale_top_y},{scale_x_max},{scale_bottom_y}]"
+        )
+        
         return scale_top_y, scale_bottom_y, scale_x_min, scale_x_max
 
     def detect_water_line_within_scale(self, image, scale_top_y, scale_bottom_y, scale_x_min, scale_x_max):
@@ -640,6 +655,16 @@ class WaterLevelDetector:
         # Apply edge detection
         edges = cv2.Canny(blurred, self.edge_low, self.edge_high)
         
+        # Debug: Save edge detection result
+        self.debug_viz.save_debug_image(
+            edges, 'edges',
+            info_text=[
+                f"Canny edges: low={self.edge_low}, high={self.edge_high}",
+                f"Blur kernel: {self.blur_kernel}x{self.blur_kernel}",
+                "Region-based edge detection"
+            ]
+        )
+        
         # Find horizontal lines (potential waterlines)
         lines = cv2.HoughLines(edges, 1, np.pi/180, threshold=min(50, scale_region.shape[1]//4))
         
@@ -654,8 +679,31 @@ class WaterLevelDetector:
                         horizontal_lines.append(y_position)
             
             if horizontal_lines:
+                median_y = int(np.median(horizontal_lines))
+                
+                # Debug: Save contours/lines detection result
+                detected_lines = []
+                for y_pos in horizontal_lines:
+                    detected_lines.append({
+                        'x1': 0, 'y1': int(y_pos),
+                        'x2': scale_region.shape[1], 'y2': int(y_pos),
+                        'color': (0, 255, 0), 'thickness': 2
+                    })
+                
+                lines_annotations = {'lines': detected_lines}
+                self.debug_viz.save_debug_image(
+                    scale_region, 'contours',
+                    annotations=lines_annotations,
+                    info_text=[
+                        f"Total lines detected: {len(lines) if lines is not None else 0}",
+                        f"Horizontal lines: {len(horizontal_lines)}",
+                        f"Selected Y: {median_y}",
+                        "Region-based Hough line detection"
+                    ]
+                )
+                
                 # Return median Y coordinate
-                return int(np.median(horizontal_lines))
+                return median_y
         
         # Fallback to gradient method
         return self.detect_water_line_gradient_in_region(scale_region)
@@ -670,6 +718,17 @@ class WaterLevelDetector:
         # Calculate vertical gradient
         grad_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=5)
         grad_y = np.absolute(grad_y)
+        
+        # Debug: Save gradient visualization
+        grad_y_normalized = cv2.normalize(grad_y, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+        self.debug_viz.save_debug_image(
+            grad_y_normalized, 'gradient_analysis',
+            info_text=[
+                "Vertical gradient analysis (Sobel)",
+                f"Kernel size: 5x5",
+                "Region-based gradient detection"
+            ]
+        )
         
         # Find the row with maximum gradient (potential waterline)
         row_gradients = np.mean(grad_y, axis=1)
@@ -698,6 +757,16 @@ class WaterLevelDetector:
         # Create water color mask
         water_mask = cv2.inRange(hsv, self.water_hsv_lower, self.water_hsv_upper)
         
+        # Debug: Save water color mask for region-based detection
+        self.debug_viz.save_debug_image(
+            water_mask, 'water_color_mask',
+            info_text=[
+                f"Water HSV range: {self.water_hsv_lower} - {self.water_hsv_upper}",
+                f"Mask pixels: {cv2.countNonZero(water_mask)}",
+                "Region-based color detection"
+            ]
+        )
+        
         # Find horizontal contours in water mask
         cnts = cv2.findContours(water_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         cnts = imutils.grab_contours(cnts)
@@ -712,6 +781,24 @@ class WaterLevelDetector:
                         min_y = y
             
             if min_y < scale_region.shape[0]:
+                # Debug: Save water detection result
+                water_annotations = {
+                    'lines': [{
+                        'x1': 0, 'y1': min_y,
+                        'x2': scale_region.shape[1], 'y2': min_y,
+                        'color': (0, 255, 255), 'thickness': 2,
+                        'label': f'Water Line Y={min_y}'
+                    }]
+                }
+                self.debug_viz.save_debug_image(
+                    scale_region, 'water_detection',
+                    annotations=water_annotations,
+                    info_text=[
+                        f"Water line detected at Y={min_y}",
+                        f"Method: Color detection (region)",
+                        f"Contours found: {len(cnts)}"
+                    ]
+                )
                 return min_y
         
         # Fallback to gradient method

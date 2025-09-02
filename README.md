@@ -184,13 +184,22 @@ INFO - Processed IMG_0154.JPG: Water level = 445.5cm
 Debug images are saved in `data/debug/debug_session_TIMESTAMP/`:
 
 ```bash
-# Key debug images to review:
+# Enhanced debug images structure:
 data/debug/debug_session_20250829_102135/
-├── original/                    # Original input images
-├── scale_detection/            # Scale boundary detection
-├── waterline_within_scale/     # Waterline detection results  
-├── final_result/               # Final annotated results
-└── IMG_XXXX_summary.jpg        # Processing summary per image
+├── original/                      # Original input images
+├── preprocessed/                  # Resized images with metadata
+├── scale_detection/              # Scale boundary detection (blue rectangles)
+├── scale_bounds_enhanced/        # Enhanced scale detection with method info
+├── scale_region_extracted/       # Extracted scale regions for analysis
+├── edges/                        # Canny edge detection results
+├── contours/                     # Hough line detection results
+├── gradient_analysis/            # Vertical gradient analysis (Sobel)
+├── water_detection/              # Water detection results with annotations
+├── water_color_mask/            # Water color mask visualization
+├── waterline_within_scale/      # Waterline detection within scale bounds
+├── integrated_detection_methods/ # Multi-method comparison visualization
+├── final_result/                # Final annotated results with measurements
+└── [conditional folders]        # Additional folders based on detection methods used
 ```
 
 **What to check in debug images:**
@@ -489,13 +498,38 @@ debug:
   annotation_thickness: 2
   font_scale: 0.7
   steps_to_save:
-    - 'original'
-    - 'preprocessed' 
-    - 'edges'
-    - 'contours'
-    - 'scale_detection'
-    - 'water_detection'
-    - 'final_result'
+    # Core debugging steps (always available)
+    - 'original'                      # Original input images
+    - 'preprocessed'                  # Resized/prepared images
+    - 'scale_detection'              # Scale boundary detection
+    - 'scale_bounds_enhanced'        # Enhanced scale detection with method info
+    - 'scale_region_extracted'       # Extracted scale regions
+    - 'edges'                        # Canny edge detection
+    - 'contours'                     # Hough line detection
+    - 'gradient_analysis'            # Vertical gradient analysis
+    - 'water_detection'              # Water detection results
+    - 'integrated_detection_methods' # Multi-method comparison
+    - 'final_result'                 # Final annotated results
+    
+    # Enhanced color-based detection steps (conditional)
+    - 'color_mask_blue'              # Blue color detection masks
+    - 'color_mask_black'             # Black color detection masks  
+    - 'color_mask_combined'          # Combined color masks
+    - 'hsv_conversion'               # HSV color space conversion
+    - 'water_color_mask'            # Water color mask visualization
+    - 'masked_grayscale'             # Color-filtered grayscale images
+    
+    # Enhanced edge detection steps (conditional)
+    - 'edges_color_enhanced'         # Color-enhanced edge detection
+    - 'edges_masked_gray'            # Edges on color-masked grayscale
+    - 'edges_multi_channel'          # Combined edges from RGB channels
+    - 'edges_hue_transitions'        # Hue channel transition edges
+    - 'edges_individual_colors'      # Edges from individual color masks
+    - 'edges_final_combined'         # Final combined color-enhanced edges
+    
+    # Analysis and validation steps (conditional)
+    - 'scale_contours_analysis'      # Contour scoring for scale detection
+    - 'waterline_within_scale'       # Waterline detection within scale bounds
 ```
 
 ## Usage
@@ -753,49 +787,86 @@ DEBUG_MODE=true
 ```
 data/debug/
 └── debug_session_20250822_160530/
-    ├── original/                # Input images
-    ├── preprocessed/            # Resized images with metadata
-    ├── hsv_conversion/          # HSV color space conversion
-    ├── color_mask_yellow/       # Individual color masks
-    ├── color_mask_white/
-    ├── color_mask_red/
-    ├── color_mask_blue/
-    ├── color_mask_combined/     # Combined color masks
-    ├── edges_color_enhanced/    # Color-enhanced edge detection
-    ├── scale_contours_analysis/ # Scale detection analysis
-    ├── scale_detection/         # Scale region highlighting
-    ├── edges/                   # Standard edge detection results
-    ├── contours/                # Detected lines and features
-    ├── final_result/            # Final measurements with annotations
-    └── summary images           # Processing summary
+    # Core detection pipeline folders (always present)
+    ├── original/                      # Input images
+    ├── preprocessed/                  # Resized images with metadata
+    ├── scale_detection/              # Scale boundary detection
+    ├── scale_bounds_enhanced/        # Enhanced scale detection with method info
+    ├── scale_region_extracted/       # Extracted scale regions
+    ├── edges/                        # Canny edge detection results
+    ├── contours/                     # Hough line detection results
+    ├── gradient_analysis/            # Vertical gradient analysis
+    ├── water_detection/              # Water detection results
+    ├── integrated_detection_methods/ # Multi-method comparison
+    ├── final_result/                 # Final annotated results
+    
+    # Enhanced detection folders (conditional - when color detection enabled)
+    ├── hsv_conversion/               # HSV color space conversion
+    ├── color_mask_blue/             # Blue color detection masks
+    ├── color_mask_black/            # Black color detection masks
+    ├── color_mask_combined/         # Combined color masks
+    ├── water_color_mask/            # Water color mask visualization
+    ├── masked_grayscale/            # Color-filtered grayscale images
+    ├── edges_color_enhanced/        # Color-enhanced edge detection
+    ├── edges_masked_gray/           # Edges on color-masked grayscale
+    ├── edges_multi_channel/         # Combined edges from RGB channels
+    ├── edges_hue_transitions/       # Hue channel transition edges
+    ├── edges_individual_colors/     # Edges from individual color masks
+    ├── edges_final_combined/        # Final combined color-enhanced edges
+    └── waterline_within_scale/      # Waterline detection within scale bounds
 ```
 
-**Debug annotations include:**
+**Enhanced debug annotations include:**
 
-- **Color masks** for different scale types (yellow, white, red backgrounds; blue, black, white markings)
-- **Scale regions** highlighted with blue rectangles
-- **Contour analysis** showing scoring for scale detection candidates
-- **Enhanced edge detection** combining multiple color-based methods
-- **Detected lines** color-coded (yellow=horizontal water lines, red=other)
-- **Water level measurements** overlaid in green
-- **Processing parameters** and timing information
-- **Confidence scores** and calibration data
+**Core Detection Visualizations:**
+
+- **Scale regions** highlighted with blue rectangles showing detection method
+- **Edge detection** results with Canny parameters and kernel information  
+- **Line detection** with Hough transform results and horizontal line filtering
+- **Gradient analysis** with Sobel operator visualization and peak detection
+- **Water detection** results with detected waterlines and confidence annotations
+- **Multi-method comparison** showing results from all detection algorithms
+
+**Advanced Color-Based Analysis:**
+
+- **Color masks** for scale types (blue, black markings; various backgrounds)
+- **HSV conversion** showing color space transformation for analysis
+- **Water color masks** highlighting detected water regions
+- **Enhanced edge detection** combining RGB channels and color transitions
+- **Color-filtered analysis** showing masked grayscale and individual color processing
+
+**Detection Pipeline Information:**
+
+- **Processing parameters** including thresholds, kernel sizes, and calibration data
+- **Method selection** showing which detection approach was used (integrated/forced)
+- **Timing information** and performance metrics for each processing step
+- **Confidence scores** for individual detection methods and final consensus
+- **Scale measurement calculations** with pixel-to-cm conversions and reference points
 
 **Configure debug options** in `config.yaml`:
 
 ```yaml
 debug:
+  enabled: false              # Set to true, or use DEBUG_MODE=true environment variable
   save_debug_images: true
   debug_output_dir: 'data/debug'
   steps_to_save:
+    # Core steps (always available)
     - 'original'
     - 'preprocessed'
+    - 'scale_detection'
+    - 'edges'
+    - 'contours'
+    - 'gradient_analysis'
+    - 'water_detection'
+    - 'integrated_detection_methods'
+    - 'final_result'
+    
+    # Enhanced steps (conditional on color detection)
     - 'hsv_conversion'
     - 'color_mask_combined'
     - 'edges_color_enhanced'
-    - 'scale_contours_analysis' 
-    - 'edges'
-    - 'final_result'
+    - 'scale_contours_analysis'
 ```
 
 ### Water Detection Methods
@@ -950,8 +1021,9 @@ output:
 
 - Creates `measurements_YYYYMMDD_HHMMSS.csv` files
 - Includes all measurement data in tabular format
+- **New**: `detection_method` column shows which method was actually used (e.g., 'e_pattern_sequential', 'enhanced_gradient', 'standard', etc.)
 - Compatible with Excel, data analysis tools
-- Best for: Spreadsheet analysis, reporting, graphs
+- Best for: Spreadsheet analysis, reporting, graphs, method performance tracking
 
 **JSON Export (`json_export: true`)**
 

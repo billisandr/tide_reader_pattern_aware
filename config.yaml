@@ -191,6 +191,12 @@ debug:
       - 'color_mask_combined'       # NEW - see combined color mask
       - 'masked_grayscale'          # NEW - see color-filtered grayscale
       - 'edges'
+      - 'edges_color_enhanced'      # NEW - color-enhanced edge detection
+      - 'edges_masked_gray'         # NEW - canny edges on color-masked grayscale
+      - 'edges_multi_channel'       # NEW - combined edges from RGB channels
+      - 'edges_hue_transitions'     # NEW - hue channel color transition edges
+      - 'edges_individual_colors'   # NEW - edges from individual color masks
+      - 'edges_final_combined'      # NEW - final combined color-enhanced edges
       - 'scale_contours_analysis'   # NEW - see contour scoring
       - 'scale_bounds_enhanced'     # NEW - see detected scale bounds
       - 'scale_region_extracted'    # NEW - see extracted scale region
@@ -198,6 +204,10 @@ debug:
       - 'waterline_within_scale'    # NEW - see waterline detection
       - 'scale_detection'
       - 'water_detection'
+      - 'water_color_mask'          # NEW - water color mask visualization
+      - 'hsv_conversion'            # NEW - HSV color space conversion
+      - 'gradient_analysis'           # NEW - vertical gradient analysis (Sobel)
+      - 'integrated_detection_methods'  # NEW - multi-method detection visualization
       - 'final_result'
       
       # Pattern-aware specific debugging steps (filtered out for standard detector)

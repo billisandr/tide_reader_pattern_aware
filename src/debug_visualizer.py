@@ -33,8 +33,10 @@ class DebugVisualizer:
             # Exclude pattern-specific steps for standard detector
             pattern_steps = {step for step in all_steps if step.startswith('pattern_')}
             self.steps_to_save = all_steps - pattern_steps
+            self.logger.info(f"Standard detector: configured {len(self.steps_to_save)} debug steps: {sorted(self.steps_to_save)}")
         else:
             self.steps_to_save = all_steps
+            self.logger.info(f"Pattern-aware detector: configured {len(self.steps_to_save)} debug steps: {sorted(self.steps_to_save)}")
         
         # Current session info
         self.current_image_name = None
@@ -75,7 +77,11 @@ class DebugVisualizer:
             annotations: Dict with annotation instructions
             info_text: Additional text to display
         """
-        if not self.enabled or not self.save_images or step_name not in self.steps_to_save:
+        if not self.enabled or not self.save_images:
+            return
+            
+        if step_name not in self.steps_to_save:
+            self.logger.debug(f"Debug step '{step_name}' not in configured steps_to_save - skipping")
             return
         
         if image is None:
@@ -87,6 +93,7 @@ class DebugVisualizer:
         if step_name not in self.created_step_dirs:
             step_dir.mkdir(exist_ok=True)
             self.created_step_dirs.add(step_name)
+            self.logger.debug(f"Created debug directory for step: {step_name}")
         
         # Create a copy for annotation
         debug_image = image.copy()
