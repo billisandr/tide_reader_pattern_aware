@@ -64,7 +64,6 @@ class EPatternDetector:
         # E-pattern configuration
         e_pattern_config = config.get('detection', {}).get('pattern_aware', {}).get('e_pattern_detection', {})
         self.match_threshold = e_pattern_config.get('match_threshold', 0.6)
-        self.pixel_per_cm_tolerance = e_pattern_config.get('pixel_per_cm_tolerance', 0.3)
         self.max_consecutive_failures = e_pattern_config.get('max_consecutive_failures', 10)
         
         # E-pattern specific settings (removed double_E_pattern)

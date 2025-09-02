@@ -104,7 +104,6 @@ detection:
     # E-pattern sequential detection settings
     e_pattern_detection:
       enabled: true                   # Enable E-pattern sequential detector
-      #pixel_per_cm_tolerance: 0.30     # 30% tolerance for pixel/cm validation (more relaxed)
       single_e_cm: 5.0                # E_pattern_black/white correspond to 5 cm
       match_threshold: 0.75         # Template matching threshold for E-patterns
       max_consecutive_failures: 5    # Stop after N failures (likely reached water)

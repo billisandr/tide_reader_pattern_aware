@@ -45,8 +45,7 @@ def test_e_pattern_detector():
         print(f"[OK] Template names: {info['template_names']}")
         print(f"[OK] Single E pattern: {info['single_e_cm']} cm")
         print(f"[OK] Match threshold: {info['match_threshold']}")
-        print(f"[OK] Pixel/cm tolerance: {info['pixel_per_cm_tolerance']:.1%}")
-        print(f"[OK] Calibration pixels/cm: {info['pixel_per_cm']}")
+        print(f"[OK] Calibration pixels/cm: {info['calibration_pixel_per_cm']}")
         print()
         
         # Test template loading
@@ -87,7 +86,7 @@ def test_e_pattern_detector():
         print("- Uses calibration.yaml pixels_per_cm as reference")
         print("- Supports both E_pattern_black and E_pattern_white")
         print("- Detects patterns in normal and 180-degree flipped orientations") 
-        print("- Validates pixel/cm ratio against calibration data")
+        print("- Uses multi-scale template matching (no pixel/cm validation needed)")
         print("- Stops detection when patterns likely underwater")
         print("\nTo test with an actual image, use the pattern-aware water detector system.")
         
