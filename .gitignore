@@ -68,11 +68,15 @@ temp/
 ehthumbs.db
 Thumbs.db
 
-# Documentation files
+# Documentation files (except README files)
 documentation/
 
-# Pattern-aware documentation
-src_pattern_aware/CUSTOM_TEMPLATES_GUIDE.md
+# All markdown files except README files
+*.md
+!README.md
+!*/README.md
 
-# Issues and future work documentation
+# Specifically ignore documentation files that might be in root
+E_PATTERN_IMPLEMENTATION_SUMMARY.md
 ISSUES_AND_FUTURE_WORK.md
+CUSTOM_TEMPLATES_GUIDE.md

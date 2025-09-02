@@ -330,6 +330,68 @@ set USE_DEFAULT_TEMPLATES=true        # Override default template creation
 
 **Status:** FULLY IMPLEMENTED AND WORKING
 
+### E-Pattern Detection (WORKING)
+
+**Purpose:** Sequential detection of E-shaped scale markings for precise water level measurement using scale-invariant template matching
+
+**Key Innovation:** Templates are used **only for shape reference**, not size constraints. This approach proved more successful than template resizing methods which were limiting and unsuccessful in pattern recognition.
+
+**Scale-Invariant Process:**
+
+1. Load base E-pattern templates (black and white variants)
+2. Generate 44 template variants per base template:
+   - **11 different scales** (0.3x, 0.4x, 0.5x, 0.6x, 0.7x, 0.8x, 0.9x, 1.0x, 1.2x, 1.5x, 2.0x)
+   - **2 orientations** (normal and 180-degree flipped)
+   - **2 base patterns** (black and white E-patterns)
+3. Perform top-to-bottom sequential pattern matching
+4. Test all template variants to find natural size in input image
+5. Use detected patterns for water level calculation (5cm per pattern)
+
+**Key Features:**
+- **Scale-invariant detection**: Finds E-patterns regardless of image resolution, zoom level, or camera distance
+- **Shape-only matching**: Templates adapt to natural pattern size without forced resizing
+- **Multi-scale testing**: Automatically tests 11 different template scales
+- **Multi-orientation support**: Detects both normal and 180-degree flipped E-patterns
+- **No size validation**: Eliminates template sizing limitations that caused recognition failures
+- **Natural size detection**: Lets template matching find patterns at their actual scale
+- **Sequential water detection**: Stops when pattern matching fails (water reached)
+
+**Template Approach:**
+- **Original approach (abandoned)**: Resize templates to match expected pixel/cm ratios
+- **New approach (successful)**: Use templates at multiple scales for shape recognition only
+- **Key insight**: Resizing templates to match calibration proved limiting and unsuccessful
+- **Success factor**: Multi-scale testing finds patterns at their natural size in images
+
+**Configuration:**
+
+```yaml
+detection:
+  pattern_aware:
+    e_pattern_detection:
+      enabled: true                   # Enable E-pattern sequential detector
+      match_threshold: 0.6            # Template matching confidence threshold
+      single_e_cm: 5.0               # Each E-pattern represents 5cm (for measurement only)
+      max_consecutive_failures: 10   # Stop detection after N failures (water reached)
+      support_flipped: true          # Support 180-degree flipped patterns
+```
+
+**Template Requirements:**
+- **Base templates needed**: 2 files in `data/pattern_templates/scale_markings/`
+  - `E_pattern_black.png` - E-shaped black scale marking (size-independent)
+  - `E_pattern_white.png` - E-shaped white scale marking (size-independent)
+- **Auto-generated variants**: 44 total template variants (22 per base template)
+- **Scale factors**: Templates tested at 11 different scales automatically
+- **Orientations**: Both normal and 180-degree flipped variants created
+- **Purpose**: Shape recognition only - no size constraints applied
+
+**Debug Output:**
+- **Location**: `data/debug/e_pattern_detection/`
+- **Annotated images**: Shows detected patterns with color-coded rectangles
+- **Match information**: Detailed logs with confidence scores and scale detection
+- **Multi-scale analysis**: Information about which template scales were successful
+
+**Status:** FULLY IMPLEMENTED AND WORKING - Scale-invariant approach successful
+
 ### Morphological Detection (WORKING)
 
 **Purpose:** Separate horizontal water interfaces from vertical scale markings
