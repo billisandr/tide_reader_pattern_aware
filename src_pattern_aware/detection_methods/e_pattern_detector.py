@@ -679,16 +679,33 @@ class EPatternDetector:
             'validation_method': 'calibration_based_sizing'
         }
         
-        # Add template resize information
+        # Add template scale information (scale-invariant approach)
         template_info = {}
+        base_templates = {}
         for name, data in self.templates.items():
-            if 'scale_factor' in data:
-                template_info[name] = {
-                    'original_size': data['original_size'],
-                    'resized_size': data['resized_size'],
-                    'scale_factor': data['scale_factor']
-                }
+            # Group by base template name
+            if 'original_size' in data:
+                base_name = name.split('_scale_')[0].replace('_flipped', '')
+                if base_name not in base_templates:
+                    base_templates[base_name] = {
+                        'base_size': data['original_size'],
+                        'variants': []
+                    }
+                
+                # Extract scale and orientation info
+                scale_info = 'base'
+                if '_scale_' in name:
+                    scale_part = name.split('_scale_')[1]
+                    scale_info = scale_part.split('_')[0] if '_' in scale_part else scale_part
+                
+                orientation = 'flipped' if '_flipped' in name else 'normal'
+                base_templates[base_name]['variants'].append({
+                    'name': name,
+                    'scale': scale_info,
+                    'orientation': orientation,
+                    'size': data.get('image', np.array([])).shape if 'image' in data else 'unknown'
+                })
         
-        info['template_resize_info'] = template_info
+        info['template_scale_info'] = base_templates
         
         return info

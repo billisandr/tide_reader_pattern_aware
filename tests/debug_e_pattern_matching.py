@@ -1,5 +1,6 @@
 """
-Debug script for E-pattern matching to see confidence levels and help tune thresholds
+Debug script for E-pattern matching to see confidence levels and help tune thresholds.
+Uses scale-invariant template matching approach (multiple scales tested).
 """
 
 import cv2
@@ -32,10 +33,12 @@ def debug_template_matching(image_path):
         print(f"Could not load image: {image_path}")
         return
     
-    print(f"Debugging template matching on: {image_path}")
+    print(f"Debugging scale-invariant template matching on: {image_path}")
     print(f"Image size: {image.shape}")
     print(f"Current match threshold: {detector.match_threshold}")
-    print(f"Templates loaded: {len(detector.templates)}")
+    print(f"Template variants loaded: {len(detector.templates)} (includes multiple scales and orientations)")
+    print(f"Scale factors tested: 0.3x to 2.0x (11 different scales)")
+    print(f"Pattern types: E-pattern black/white with normal and flipped orientations")
     print()
     
     # Convert to grayscale for template matching
@@ -44,11 +47,20 @@ def debug_template_matching(image_path):
     else:
         gray_image = image.copy()
     
-    # Test each template on the entire image
+    # Test each template variant on the entire image (scale-invariant approach)
+    # Note: Templates include multiple scales (0.3x to 2.0x) and orientations (normal + flipped)
     for template_name, template_data in detector.templates.items():
         template = template_data['image']
-        print(f"Testing template: {template_name}")
+        print(f"Testing template variant: {template_name}")
         print(f"Template size: {template.shape}")
+        
+        # Extract scale information from template name if available
+        if 'scale_' in template_name:
+            print(f"  Scale variant: {template_name.split('scale_')[1] if '_scale_' in template_name else 'base'}")
+        if 'flipped' in template_name:
+            print(f"  Orientation: 180-degree flipped")
+        else:
+            print(f"  Orientation: normal")
         
         if gray_image.shape[0] < template.shape[0] or gray_image.shape[1] < template.shape[1]:
             print(f"  Image too small for template, skipping")
@@ -86,6 +98,11 @@ def debug_template_matching(image_path):
         print()
     
     print("Debug complete. Consider adjusting match_threshold based on these results.")
+    print("\nNOTE: This E-pattern detector uses scale-invariant template matching:")
+    print("- Templates are tested at multiple scales (0.3x to 2.0x)")
+    print("- No template resizing to match calibration ratios (previous approach was limiting)")
+    print("- Templates find patterns at their natural size in input images")
+    print("- 5cm measurement value used only for final calculation, not template sizing")
 
 if __name__ == "__main__":
     import sys

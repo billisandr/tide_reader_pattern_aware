@@ -4,8 +4,12 @@ Test script for E-pattern sequential detection system
 
 import cv2
 import yaml
+import sys
 from pathlib import Path
-from src_pattern_aware.detection_methods.e_pattern_detector import EPatternDetector
+
+# Add src_pattern_aware to path
+sys.path.append(str(Path(__file__).parent.parent / 'src_pattern_aware'))
+from detection_methods.e_pattern_detector import EPatternDetector
 
 def test_e_pattern_detector():
     """Test the E-pattern detector functionality."""
@@ -68,9 +72,9 @@ def test_e_pattern_detector():
         if missing_templates:
             print(f"\n[WARN] {len(missing_templates)} templates missing. E-pattern detection may not work properly.")
         else:
-            print(f"\n[OK] All {len(found_templates)} E-pattern templates found!")
-            print(f"[OK] Templates will be loaded in both normal and 180-degree flipped orientations")
-            print(f"[OK] Total template variants available: {len(found_templates) * 2}")
+            print(f"\n[OK] All {len(found_templates)} base E-pattern templates found!")
+            print(f"[OK] Templates loaded at multiple scales (0.3x to 2.0x) and orientations")
+            print(f"[OK] Total template variants generated: {info['templates_loaded']}")
             
         # Test configuration loading
         e_config = config.get('detection', {}).get('pattern_aware', {}).get('e_pattern_detection', {})
