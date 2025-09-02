@@ -104,13 +104,19 @@ class IntegratedPatternDetector:
                         )
                     
                     # Return immediately on successful E-pattern detection
-                    return result
+                    return {
+                        'y_position': result,
+                        'method': 'e_pattern_sequential',
+                        'confidence': 0.9  # High confidence for E-pattern detection
+                    }
                 else:
                     self.logger.warning("E-pattern detection failed, falling back to other methods")
                     
             except Exception as e:
                 self.logger.error(f"E-pattern detection failed with error: {e}")
                 method_results['e_pattern_sequential'] = None
+        else:
+            self.logger.warning("E-pattern detector not initialized - skipping E-pattern detection")
         
         # FALLBACK: Try other pattern methods
         self.logger.info("Trying fallback pattern detection methods")
@@ -146,7 +152,11 @@ class IntegratedPatternDetector:
                                     info_text=f"{method_name} detected water line at Y={result}"
                                 )
                             
-                            return result
+                            return {
+                                'y_position': result,
+                                'method': method_name,
+                                'confidence': 0.7  # Medium confidence for fallback methods
+                            }
                     except Exception as e:
                         self.logger.warning(f"Method {method_name} failed: {e}")
                         method_results[method_name] = None

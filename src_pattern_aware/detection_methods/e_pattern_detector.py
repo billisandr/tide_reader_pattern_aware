@@ -198,7 +198,12 @@ class EPatternDetector:
             
             # Save debug information if enabled
             if self.debug_enabled and image_path:
+                self.logger.info(f"Saving E-pattern debug info for image: {Path(image_path).name}")
                 self._save_debug_info(scale_region, water_line_y, image_path)
+            elif not self.debug_enabled:
+                self.logger.debug("E-pattern debug disabled in config")
+            elif not image_path:
+                self.logger.warning("No image path provided for E-pattern debug")
             
             if water_line_y is not None:
                 self.logger.info(f"E-pattern detection successful: water line at Y={water_line_y}")
@@ -210,6 +215,19 @@ class EPatternDetector:
             
         except Exception as e:
             self.logger.error(f"E-pattern detection failed: {e}")
+            
+            # Save debug information even on failure
+            if self.debug_enabled and image_path:
+                try:
+                    self.logger.info(f"Saving E-pattern debug info for failed detection: {Path(image_path).name}")
+                    self._save_debug_info(scale_region, None, image_path)
+                except Exception as debug_error:
+                    self.logger.error(f"Failed to save debug info on exception: {debug_error}")
+            elif not self.debug_enabled:
+                self.logger.debug("E-pattern debug disabled in config")
+            elif not image_path:
+                self.logger.warning("No image path provided for E-pattern debug")
+            
             return None
     
     def _sequential_pattern_matching(self, gray_region, color_region):
@@ -444,13 +462,16 @@ class EPatternDetector:
                 # Save debug files in the pattern-aware session directory
                 e_debug_dir = self.debug_viz.session_dir / 'e_pattern_detection'
                 e_debug_dir.mkdir(parents=True, exist_ok=True)
+                self.logger.info(f"Saving E-pattern debug info to: {e_debug_dir}")
             else:
                 # Fallback to standalone debug directory
                 e_debug_dir = self.debug_dir / 'e_pattern_detection'
                 e_debug_dir.mkdir(parents=True, exist_ok=True)
+                self.logger.info(f"Saving E-pattern debug info to fallback dir: {e_debug_dir}")
             
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            base_name = f"e_pattern_{timestamp}"
+            image_name = Path(image_path).stem  # Get filename without extension
+            base_name = f"e_pattern_{image_name}_{timestamp}"
             
             # Save detailed annotated scale region with matched patterns
             annotated_region = self._create_annotated_region(scale_region, water_line_y)

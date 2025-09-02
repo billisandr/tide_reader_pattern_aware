@@ -28,6 +28,7 @@ class DatabaseManager:
                 scale_above_water_cm REAL,
                 image_path TEXT,
                 confidence REAL,
+                detection_method TEXT,
                 processed_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -40,22 +41,30 @@ class DatabaseManager:
             )
         ''')
         
+        # Add detection_method column if it doesn't exist (for existing databases)
+        try:
+            cursor.execute("ALTER TABLE measurements ADD COLUMN detection_method TEXT")
+            self.logger.info("Added detection_method column to existing database")
+        except sqlite3.OperationalError:
+            # Column already exists
+            pass
+        
         conn.commit()
         conn.close()
         
         self.logger.info(f"Database initialized at {self.db_path}")
     
     def store_measurement(self, timestamp, water_level, scale_above_water, 
-                         image_path, confidence):
+                         image_path, confidence, detection_method=None):
         """Store a water level measurement."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
         cursor.execute('''
             INSERT INTO measurements 
-            (timestamp, water_level_cm, scale_above_water_cm, image_path, confidence)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (timestamp, water_level, scale_above_water, image_path, confidence))
+            (timestamp, water_level_cm, scale_above_water_cm, image_path, confidence, detection_method)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (timestamp, water_level, scale_above_water, image_path, confidence, detection_method))
         
         # Mark image as processed
         cursor.execute('''

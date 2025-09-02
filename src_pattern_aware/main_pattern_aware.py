@@ -249,7 +249,8 @@ def run_pattern_aware_main(detection_system, config):
                                 water_level=result['water_level_cm'],
                                 scale_above_water=result.get('scale_above_water_cm'),
                                 image_path=str(image_path),
-                                confidence=result.get('confidence', 0.0)
+                                confidence=result.get('confidence', 0.0),
+                                detection_method=result.get('detection_method', 'unknown')
                             )
                             
                             # Move to processed directory (or copy if DEBUG_MODE)

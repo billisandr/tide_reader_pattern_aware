@@ -1903,6 +1903,7 @@ class WaterLevelDetector:
                 result['image_path'] = image_path
                 result['confidence'] = self.estimate_confidence(result)
                 result['processing_time'] = time.time() - start_time
+                result['detection_method'] = 'standard'
                 
                 # Debug: Create final result visualization
                 final_annotations = {
@@ -2064,7 +2065,9 @@ class WaterLevelDetector:
         
         # Include success/failure status in filename
         status = "success" if result else "failed"
-        output_path = annotated_dir / f"annotated_{status}_{datetime.now().strftime('%Y%m%d_%H%M%S')}{image_format}"
+        image_name = Path(image_path).stem  # Get filename without extension
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        output_path = annotated_dir / f"annotated_{status}_{image_name}_{timestamp}{image_format}"
         success = cv2.imwrite(str(output_path), annotated)
         
         if success:
@@ -2108,7 +2111,9 @@ class WaterLevelDetector:
         annotated_dir = Path('data/output/annotated')
         annotated_dir.mkdir(parents=True, exist_ok=True)
         
-        output_path = annotated_dir / f"annotated_{datetime.now().strftime('%Y%m%d_%H%M%S')}{image_format}"
+        # Use microseconds for better uniqueness in legacy method
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+        output_path = annotated_dir / f"annotated_legacy_{timestamp}{image_format}"
         success = cv2.imwrite(str(output_path), annotated)
         
         if success:

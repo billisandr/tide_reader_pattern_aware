@@ -187,7 +187,7 @@ class PatternWaterDetector:
             )
             
             # Detect water line using pattern-aware methods
-            water_line_y = self._detect_water_line_pattern_aware(scale_region, image_path)
+            water_line_y, detection_method_used = self._detect_water_line_pattern_aware(scale_region, image_path)
             
             if water_line_y is None:
                 if self.fallback_enabled:
@@ -237,7 +237,7 @@ class PatternWaterDetector:
                 'image_path': str(image_path),
                 'water_level_cm': water_level_cm,
                 'scale_above_water_cm': self.scale_height_cm - water_level_cm,
-                'detection_method': 'pattern_aware',
+                'detection_method': detection_method_used or 'pattern_aware',
                 'pattern_engine': self.pattern_engine,
                 'water_line_y': global_y,
                 'confidence': 0.95,  # Pattern methods generally have high confidence
@@ -415,19 +415,31 @@ class PatternWaterDetector:
             image_path: Original image path for debugging
             
         Returns:
-            int: Y-coordinate of detected water line (local to scale region)
+            tuple: (Y-coordinate, detection_method) or (None, None) if failed
         """
+        result = None
+        method_used = None
+        
         if self.pattern_engine == 'integrated_pattern':
-            return self.integrated_detector.detect_waterline(scale_region, image_path)
+            detection_result = self.integrated_detector.detect_waterline(scale_region, image_path)
+            if isinstance(detection_result, dict):
+                result = detection_result.get('y_position')
+                method_used = detection_result.get('method')
+            else:
+                # Backwards compatibility
+                result = detection_result
+                method_used = 'integrated_pattern'
         
         # Single method detection
         elif self.pattern_engine in self.detection_methods:
             method = self.detection_methods[self.pattern_engine]
-            return method.detect_waterline(scale_region)
+            result = method.detect_waterline(scale_region)
+            method_used = self.pattern_engine if result is not None else None
         
         else:
             self.logger.error(f"Unknown pattern engine: {self.pattern_engine}")
-            return None
+        
+        return result, method_used
     
     def _calculate_water_level(self, water_line_y, image_height):
         """Calculate water level in cm from pixel coordinates."""
