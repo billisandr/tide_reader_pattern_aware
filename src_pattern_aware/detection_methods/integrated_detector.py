@@ -44,7 +44,7 @@ class IntegratedPatternDetector:
         self.e_pattern_detector = None
         if calibration_data is not None:
             try:
-                self.e_pattern_detector = EPatternDetector(config, calibration_data)
+                self.e_pattern_detector = EPatternDetector(config, calibration_data, debug_viz)
                 pixels_per_cm = calibration_data.get('pixels_per_cm', 'unknown')
                 self.logger.info(f"E-pattern sequential detector initialized successfully with pixels_per_cm: {pixels_per_cm}")
             except Exception as e:

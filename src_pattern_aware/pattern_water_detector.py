@@ -36,10 +36,8 @@ except ImportError:
 
 # Import pattern analysis utilities - handle both relative and absolute imports
 try:
-    from .pattern_analysis.template_manager import TemplateManager
     from .pattern_analysis.pattern_classifier import PatternClassifier
 except ImportError:
-    from pattern_analysis.template_manager import TemplateManager
     from pattern_analysis.pattern_classifier import PatternClassifier
 
 class PatternWaterDetector:
@@ -80,7 +78,6 @@ class PatternWaterDetector:
         self.debug_viz = DebugVisualizer(config, enabled=debug_enabled, session_prefix='pattern_aware')
         
         # Initialize pattern analysis components
-        self.template_manager = TemplateManager(config)
         self.pattern_classifier = PatternClassifier(config)
         
         # Initialize detection methods
@@ -98,7 +95,7 @@ class PatternWaterDetector:
         # Template Matching Detector
         if self.pattern_config.get('template_matching', {}).get('enabled', True):
             self.detection_methods['template_matching'] = TemplateMatchingDetector(
-                self.config, self.template_manager
+                self.config, None
             )
         
         # Morphological Detector
@@ -140,8 +137,8 @@ class PatternWaterDetector:
             confidence = self.enhanced_calibration_data.get('confidence', 'unknown')
             self.logger.info(f"Using enhanced calibration: {method} (confidence: {confidence})")
         
-        # Check for existing templates
-        template_count = self.template_manager.get_template_count()
+        # Check for existing templates (template manager removed - stub functionality)
+        template_count = 0  # Template manager was stub implementation returning 0
         if template_count > 0:
             self.logger.info(f"Loaded {template_count} existing scale marking templates")
         else:
@@ -492,12 +489,12 @@ class PatternWaterDetector:
             if scale_region is None:
                 raise ValueError("Could not extract scale region from calibration image")
             
-            # Extract templates using template manager
-            template_count = self.template_manager.extract_templates_from_region(scale_region)
+            # Template extraction (template manager removed - was stub implementation)
+            template_count = 0  # Template manager was stub implementation returning 0
             
             if self.save_templates:
-                self.template_manager.save_templates()
-                self.logger.info(f"Extracted and saved {template_count} scale marking templates")
+                # Template saving was stub implementation - no action needed
+                self.logger.info(f"Template extraction was stub implementation (extracted: {template_count})")
             
             return template_count
             
@@ -512,7 +509,7 @@ class PatternWaterDetector:
             'processing_mode': self.processing_mode,
             'pattern_engine': self.pattern_engine,
             'available_methods': list(self.detection_methods.keys()),
-            'template_count': self.template_manager.get_template_count(),
+            'template_count': 0,  # Template manager was stub implementation
             'fallback_enabled': self.fallback_enabled,
             'debug_enabled': self.debug_patterns
         }

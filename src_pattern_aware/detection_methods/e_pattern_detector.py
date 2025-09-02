@@ -3,9 +3,9 @@ E-Pattern Sequential Scale Measurement Detector
 
 Specialized detector for E-shaped scale markings that implements:
 1. Top-to-bottom pattern matching on detected scale
-2. Hierarchical pattern matching (double_E_pattern -> E_pattern_black/white)
-3. Pixel per cm calculation and validation against calibration
-4. Stopping condition when pixel per cm differs significantly (underwater detection)
+2. Scale-invariant template matching (E_pattern_black/white at multiple scales)
+3. Shape-only template matching without size constraints
+4. Stopping condition when consecutive pattern matching fails (underwater detection)
 5. Debug storage of matched pattern positions
 """
 
@@ -21,23 +21,25 @@ class EPatternDetector:
     Sequential E-pattern detector for scale measurement.
     
     Process:
-    1. Load E-shaped templates (double_E_pattern, E_pattern_black, E_pattern_white)
+    1. Load E-shaped templates (E_pattern_black, E_pattern_white) at multiple scales
     2. Start from top of scale, move downwards
-    3. Try double_E_pattern first (10cm), then smaller E-patterns (5cm)
-    4. Calculate pixel per cm for each match
-    5. Stop when pixel per cm differs significantly from calibration
+    3. Test all template variants (11 scales × 2 orientations) for best match
+    4. Use 5cm measurement value for detected E-patterns
+    5. Stop when consecutive pattern matching failures exceed threshold
     6. Store debug info and images
     """
     
-    def __init__(self, config, calibration_data=None):
+    def __init__(self, config, calibration_data=None, debug_viz=None):
         """
         Initialize E-pattern detector.
         
         Args:
             config: System configuration
             calibration_data: Enhanced calibration data containing pixels_per_cm
+            debug_viz: Optional debug visualizer for saving debug images in pattern-aware session
         """
         self.config = config
+        self.debug_viz = debug_viz
         self.logger = logging.getLogger(__name__)
         
         # Get pixels_per_cm from calibration data
@@ -66,8 +68,8 @@ class EPatternDetector:
         self.match_threshold = e_pattern_config.get('match_threshold', 0.6)
         self.max_consecutive_failures = e_pattern_config.get('max_consecutive_failures', 10)
         
-        # E-pattern specific settings (removed double_E_pattern)
-        self.single_e_cm = e_pattern_config.get('single_e_cm', 5.0)   # E_pattern_black/white correspond to 5 cm
+        # E-pattern specific settings
+        self.single_e_cm = e_pattern_config.get('single_e_cm', 5.0)   # Each E-pattern represents 5 cm
         
         # Template directory
         self.template_dir = Path(config.get('pattern_processing', {}).get('template_directory', 
@@ -437,9 +439,15 @@ class EPatternDetector:
     def _save_debug_info(self, scale_region, water_line_y, image_path):
         """Save debug information and annotated images."""
         try:
-            # Create debug directory for E-pattern detection
-            e_debug_dir = self.debug_dir / 'e_pattern_detection'
-            e_debug_dir.mkdir(parents=True, exist_ok=True)
+            # Use pattern-aware session directory if debug_viz is available
+            if self.debug_viz and hasattr(self.debug_viz, 'session_dir'):
+                # Save debug files in the pattern-aware session directory
+                e_debug_dir = self.debug_viz.session_dir / 'e_pattern_detection'
+                e_debug_dir.mkdir(parents=True, exist_ok=True)
+            else:
+                # Fallback to standalone debug directory
+                e_debug_dir = self.debug_dir / 'e_pattern_detection'
+                e_debug_dir.mkdir(parents=True, exist_ok=True)
             
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             base_name = f"e_pattern_{timestamp}"

@@ -29,7 +29,7 @@ class TemplateMatchingDetector:
         
         Args:
             config: System configuration
-            template_manager: Template management instance
+            template_manager: Template management instance (can be None - was stub implementation)
         """
         self.config = config
         self.template_manager = template_manager
@@ -163,13 +163,16 @@ class TemplateMatchingDetector:
             if local_templates:
                 self.logger.debug(f"Retrieved {len(local_templates)} local templates")
         
-        # Get templates from template manager
+        # Get templates from template manager (template manager removed - was stub implementation)
         if self.template_source in ['manager', 'both'] and self.template_manager:
             try:
-                manager_templates = self.template_manager.get_templates() if hasattr(self.template_manager, 'get_templates') else []
+                # Template manager was stub implementation that always returned empty list
+                manager_templates = []  # Template manager was removed as it was non-functional stub
                 if manager_templates:
                     templates.extend(manager_templates)
                     self.logger.debug(f"Retrieved {len(manager_templates)} templates from manager")
+                else:
+                    self.logger.debug("Template manager was stub implementation - no templates available")
             except Exception as e:
                 self.logger.warning(f"Failed to get templates from manager: {e}")
         
@@ -648,11 +651,8 @@ class TemplateMatchingDetector:
         local_template_count = len(self.templates)
         manager_template_count = 0
         
-        if self.template_manager and hasattr(self.template_manager, 'get_template_count'):
-            try:
-                manager_template_count = self.template_manager.get_template_count()
-            except:
-                manager_template_count = 0
+        # Template manager was stub implementation that always returned 0
+        manager_template_count = 0  # Template manager was removed as it was non-functional stub
         
         total_templates = len(self._get_templates())
         

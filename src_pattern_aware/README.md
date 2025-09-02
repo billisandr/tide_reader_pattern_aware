@@ -242,7 +242,7 @@ src_pattern_aware/
 ├── pattern_analysis/                  # PLANNED: Pattern recognition utilities
 │   ├── marking_extractor.py          # Template extraction from calibration
 │   ├── pattern_classifier.py         # Marking vs water classification
-│   └── template_manager.py           # Template persistence & management
+│                                      # (template_manager.py removed - was stub implementation)
 └── utils/                            # PLANNED: Pattern-specific utilities
     ├── image_processing.py           # Pattern image processing
     ├── geometric_utils.py            # Geometric analysis
@@ -684,7 +684,7 @@ src_pattern_aware/                     # Pattern-aware detection module
 ├── pattern_analysis/                  # PLANNED: Pattern recognition utilities
 │   ├── marking_extractor.py          # Template extraction from calibration
 │   ├── pattern_classifier.py         # Marking vs water classification
-│   └── template_manager.py           # Template persistence & management
+│                                      # (template_manager.py removed - was stub implementation)
 └── utils/                            # PLANNED: Pattern-specific utilities
     ├── image_processing.py           # Pattern image processing
     ├── geometric_utils.py            # Geometric analysis
