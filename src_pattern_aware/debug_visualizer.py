@@ -25,8 +25,8 @@ class DebugVisualizer:
         default_debug_dir = f'data/debug_{session_prefix}' if session_prefix != 'standard' else 'data/debug'
         self.output_dir = Path(self.debug_config.get('debug_output_dir', default_debug_dir))
         self.color = tuple(self.debug_config.get('annotation_color', [0, 255, 0]))  # BGR
-        self.thickness = self.debug_config.get('annotation_thickness', 2)
-        self.font_scale = self.debug_config.get('font_scale', 0.7)
+        self.thickness = self.debug_config.get('annotation_thickness', 3)
+        self.font_scale = self.debug_config.get('font_scale', 0.9)
         self.font = cv2.FONT_HERSHEY_SIMPLEX
         self.steps_to_save = set(self.debug_config.get('steps_to_save', []))
         
@@ -93,12 +93,8 @@ class DebugVisualizer:
         if annotations:
             debug_image = self._apply_annotations(debug_image, annotations)
         
-        # Add info text
-        if info_text:
-            debug_image = self._add_info_text(debug_image, info_text)
-        
-        # Add step title
-        debug_image = self._add_title(debug_image, step_name)
+        # Add info text and title in side panel
+        debug_image = self._add_side_panel(debug_image, step_name, info_text)
         
         # Save image
         filename = f"{self.current_image_name}_{step_name}.jpg"
@@ -130,7 +126,7 @@ class DebugVisualizer:
                     # Add label above rectangle
                     label_pos = (pt1[0], pt1[1] - 10)
                     cv2.putText(annotated, label, label_pos, self.font, 
-                               self.font_scale, color, 1, cv2.LINE_AA)
+                               self.font_scale, color, 2, cv2.LINE_AA)
         
         # Draw contours
         if 'contours' in annotations:
@@ -154,7 +150,7 @@ class DebugVisualizer:
                 if label:
                     label_pos = (center[0] + 10, center[1])
                     cv2.putText(annotated, label, label_pos, self.font,
-                               self.font_scale, color, 1, cv2.LINE_AA)
+                               self.font_scale, color, 2, cv2.LINE_AA)
         
         # Draw lines
         if 'lines' in annotations:
@@ -172,7 +168,7 @@ class DebugVisualizer:
                     mid_x = (pt1[0] + pt2[0]) // 2
                     mid_y = (pt1[1] + pt2[1]) // 2
                     cv2.putText(annotated, label, (mid_x, mid_y), self.font,
-                               self.font_scale, color, 1, cv2.LINE_AA)
+                               self.font_scale, color, 2, cv2.LINE_AA)
         
         # Draw text annotations
         if 'text' in annotations:
@@ -183,41 +179,98 @@ class DebugVisualizer:
                 scale = text_item.get('scale', self.font_scale)
                 
                 cv2.putText(annotated, text, position, self.font,
-                           scale, color, 1, cv2.LINE_AA)
+                           scale, color, 2, cv2.LINE_AA)
         
         return annotated
     
-    def _add_info_text(self, image, info_text):
-        """Add informational text to the bottom of the image."""
+    def _add_side_panel(self, image, step_name, info_text):
+        """Add title and info text in a side panel next to the image."""
         h, w = image.shape[:2]
         
-        # Split text into lines
-        lines = info_text.split('\n') if isinstance(info_text, str) else info_text
+        # Prepare title
+        title_text = step_name.replace('_', ' ').title()
         
-        # Add background rectangle for better readability
-        text_height = 25 * len(lines)
-        cv2.rectangle(image, (0, h - text_height - 10), (w, h), (0, 0, 0), -1)
+        # Prepare info text lines
+        info_lines = []
+        if info_text:
+            if isinstance(info_text, str):
+                info_lines = info_text.split('\n')
+            else:
+                info_lines = info_text
         
-        # Add text lines
-        for i, line in enumerate(lines):
-            y_pos = h - text_height + (i * 25) + 15
-            cv2.putText(image, line, (10, y_pos), self.font,
-                       0.5, (255, 255, 255), 1, cv2.LINE_AA)
+        # Calculate panel width (30% of image width, minimum 300px, maximum 500px)
+        panel_width = max(300, min(500, int(w * 0.3)))
         
-        return image
-    
-    def _add_title(self, image, title):
-        """Add title at the top of the image."""
-        title_text = f"Debug Step: {title.replace('_', ' ').title()}"
+        # Calculate required panel height
+        line_height = 20
+        title_lines = 2  # Title + spacing
+        total_lines = title_lines + len(info_lines)
+        panel_height = max(h, total_lines * line_height + 40)  # Ensure minimum height matches image
         
-        # Add background rectangle
-        cv2.rectangle(image, (0, 0), (len(title_text) * 12, 30), (0, 0, 0), -1)
+        # Add gap between image and panel
+        gap_width = 10
+        total_width = w + gap_width + panel_width
         
-        # Add title text
-        cv2.putText(image, title_text, (10, 20), self.font,
+        # Create combined image with side panel and gap
+        combined_image = np.zeros((panel_height, total_width, 3), dtype=np.uint8)
+        
+        # Copy original image to left side
+        combined_image[:h, :w] = image
+        
+        # Create black panel on the right side (after gap)
+        panel_start_x = w + gap_width
+        cv2.rectangle(combined_image, (panel_start_x, 0), (panel_start_x + panel_width, panel_height), (0, 0, 0), -1)
+        
+        # Add title to panel
+        title_y = 30
+        cv2.putText(combined_image, title_text, (panel_start_x + 10, title_y), self.font,
                    0.6, (255, 255, 255), 1, cv2.LINE_AA)
         
-        return image
+        # Add separator line
+        cv2.line(combined_image, (panel_start_x + 10, title_y + 10), (panel_start_x + panel_width - 10, title_y + 10), 
+                (100, 100, 100), 1)
+        
+        # Add info text lines
+        if info_lines:
+            start_y = title_y + 40
+            max_chars_per_line = max(1, (panel_width - 20) // 7)  # Estimate chars that fit in panel
+            
+            current_y = start_y
+            for line in info_lines:
+                if len(line) <= max_chars_per_line:
+                    cv2.putText(combined_image, line, (panel_start_x + 10, current_y), self.font,
+                               0.4, (200, 200, 200), 1, cv2.LINE_AA)
+                    current_y += line_height
+                else:
+                    # Word wrap long lines
+                    words = line.split(' ')
+                    current_line = ""
+                    
+                    for word in words:
+                        test_line = current_line + (" " if current_line else "") + word
+                        if len(test_line) <= max_chars_per_line:
+                            current_line = test_line
+                        else:
+                            if current_line:
+                                cv2.putText(combined_image, current_line, (panel_start_x + 10, current_y), 
+                                           self.font, 0.4, (200, 200, 200), 1, cv2.LINE_AA)
+                                current_y += line_height
+                                current_line = word
+                            else:
+                                # Single word too long, force break
+                                cv2.putText(combined_image, word[:max_chars_per_line], 
+                                           (panel_start_x + 10, current_y), self.font, 0.4, 
+                                           (200, 200, 200), 1, cv2.LINE_AA)
+                                current_y += line_height
+                                current_line = word[max_chars_per_line:]
+                    
+                    # Add remaining text
+                    if current_line:
+                        cv2.putText(combined_image, current_line, (panel_start_x + 10, current_y), 
+                                   self.font, 0.4, (200, 200, 200), 1, cv2.LINE_AA)
+                        current_y += line_height
+        
+        return combined_image
     
     def create_summary_image(self, results):
         """Create a summary image with key measurements and detection results."""

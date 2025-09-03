@@ -473,15 +473,10 @@ class EPatternDetector:
             image_name = Path(image_path).stem  # Get filename without extension
             base_name = f"e_pattern_{image_name}_{timestamp}"
             
-            # Save detailed annotated scale region with matched patterns
+            # Save annotated scale region with side panel
             annotated_region = self._create_annotated_region(scale_region, water_line_y)
             annotated_path = e_debug_dir / f"{base_name}_annotated.png"
             cv2.imwrite(str(annotated_path), annotated_region)
-            
-            # Save clean outline-only version for better readability
-            outline_region = self._create_outline_annotated_region(scale_region, water_line_y)
-            outline_path = e_debug_dir / f"{base_name}_outlines.png"
-            cv2.imwrite(str(outline_path), outline_region)
             
             # Save detailed match information
             info_path = e_debug_dir / f"{base_name}_matches.txt"
@@ -565,121 +560,161 @@ class EPatternDetector:
                     f.write(f"    Template correctly sized: {match.get('template_correctly_sized', 'No pre-sizing')}\n")
                     f.write("\n")
             
-            self.logger.info(f"Saved E-pattern debug info: {annotated_path}, {outline_path}, {info_path}")
+            self.logger.info(f"Saved E-pattern debug info: {annotated_path}, {info_path}")
             
         except Exception as e:
             self.logger.error(f"Failed to save E-pattern debug info: {e}")
     
     def _create_annotated_region(self, scale_region, water_line_y):
-        """Create annotated scale region showing matched patterns and water line."""
-        annotated = scale_region.copy()
+        """Create annotated scale region with side panel showing matched patterns and water line."""
+        h, w = scale_region.shape[:2]
         
-        # Colors for different templates
-        colors = {
-            'E_pattern_black': (0, 255, 0),        # Green
-            'E_pattern_white': (0, 255, 255),      # Yellow
-            'E_pattern_black_flipped': (0, 128, 255),   # Orange
-            'E_pattern_white_flipped': (255, 128, 0)    # Cyan
-        }
+        # Use purple color for better visibility
+        purple_color = (128, 0, 128)  # Purple in BGR format
         
-        # Draw matched patterns
+        # Create image with only pattern outlines and water line (no text overlays)
+        annotated_image = scale_region.copy()
+        
+        # Draw matched patterns (outlines only)
         for match in self.matched_patterns:
-            template_name = match['template_name']
-            color = colors.get(template_name, (255, 255, 255))
-            
             x, y = match['local_x'], match['global_y']
-            w, h = match['template_size']
+            w_match, h_match = match['template_size']
             
-            # Draw rectangle around match
-            cv2.rectangle(annotated, (x, y), (x + w, y + h), color, 2)
-            
-            # Add label
-            label = f"{template_name.replace('_pattern', '')} ({match['cm_value']}cm)"
-            cv2.putText(annotated, label, (x, y - 5), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
-            
-            # Add confidence
-            conf_text = f"{match['confidence']:.2f}"
-            cv2.putText(annotated, conf_text, (x + w + 5, y + 15), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.3, color, 1)
+            # Draw rectangle around match with thicker purple lines
+            cv2.rectangle(annotated_image, (x, y), (x + w_match, y + h_match), purple_color, 3)
         
         # Draw water line if detected
         if water_line_y is not None:
-            cv2.line(annotated, (0, water_line_y), (annotated.shape[1], water_line_y), 
-                    (0, 0, 255), 3)  # Red line for water level
-            cv2.putText(annotated, f"Water Line (Y={water_line_y})", (5, water_line_y - 10), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+            cv2.line(annotated_image, (0, water_line_y), (annotated_image.shape[1], water_line_y), 
+                    (0, 0, 255), 4)  # Red line for water level
         
-        # Add legend
-        legend_y = 20
-        for template_name, color in colors.items():
-            if any(m['template_name'] == template_name for m in self.matched_patterns):
-                cm_value = self.templates[template_name]['cm_value']
-                legend_text = f"{template_name}: {cm_value}cm"
-                cv2.putText(annotated, legend_text, (5, legend_y), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
-                legend_y += 20
+        # Prepare info text for side panel
+        info_lines = []
+        info_lines.append("E-Pattern Detection Results")
+        info_lines.append("")
         
-        return annotated
-    
-    def _create_outline_annotated_region(self, scale_region, water_line_y):
-        """Create clean annotated scale region showing only pattern outlines."""
-        annotated = scale_region.copy()
-        
-        # Use purple color for all pattern outlines
-        purple_color = (128, 0, 128)  # Purple in BGR format
-        
-        # Draw pattern outlines with thick purple lines
-        for match in self.matched_patterns:
-            x, y = match['local_x'], match['global_y']
-            w, h = match['template_size']
-            
-            # Draw thick purple rectangle outline
-            cv2.rectangle(annotated, (x, y), (x + w, y + h), purple_color, 3)
-        
-        # Draw water line if detected (thicker line)
-        if water_line_y is not None:
-            cv2.line(annotated, (0, water_line_y), (annotated.shape[1], water_line_y), 
-                    (0, 0, 255), 2)  # Red line for water level
-        
-        # Add minimal legend in top corner
-        legend_y = 15
-        font_scale = 0.4
-        thickness = 1
-        
-        # Count patterns by type for summary
+        # Pattern summary
         pattern_counts = {}
         for match in self.matched_patterns:
             pattern_type = match['template_name'].replace('_flipped', '')
             pattern_counts[pattern_type] = pattern_counts.get(pattern_type, 0) + 1
         
-        # Show pattern counts with purple color to match outlines
-        cv2.putText(annotated, f"E-Patterns (purple outlines):", (5, legend_y), 
-                   cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), thickness)
-        legend_y += 15
-        
         for pattern_type, count in pattern_counts.items():
-            cv2.putText(annotated, f"{pattern_type}: {count}", (5, legend_y), 
-                       cv2.FONT_HERSHEY_SIMPLEX, font_scale, purple_color, thickness)
-            legend_y += 12
+            pattern_name = pattern_type.replace('E_pattern_', '').replace('_', ' ').title()
+            info_lines.append(f"{pattern_name}: {count} patterns (Purple)")
         
-        # Show total count and scale measurement
+        info_lines.append("")
+        info_lines.append(f"Total patterns found: {len(self.matched_patterns)}")
+        
+        # Scale measurement
         total_patterns = len(self.matched_patterns)
-        scale_above_water = total_patterns * self.single_e_cm
-        
-        legend_y += 5
-        cv2.putText(annotated, f"Total: {total_patterns} patterns", (5, legend_y), 
-                   cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), thickness)
-        legend_y += 12
-        cv2.putText(annotated, f"Scale: {scale_above_water}cm", (5, legend_y), 
-                   cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), thickness)
+        scale_above_water_cm = total_patterns * self.single_e_cm
+        info_lines.append(f"Scale above water: {scale_above_water_cm} cm")
+        info_lines.append(f"Each E-pattern = {self.single_e_cm} cm")
         
         if water_line_y is not None:
-            legend_y += 12
-            cv2.putText(annotated, f"Water at Y={water_line_y}", (5, legend_y), 
-                       cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 255), thickness)
+            info_lines.append("")
+            info_lines.append(f"Water line detected at Y = {water_line_y}")
         
-        return annotated
+        # Match details
+        if self.matched_patterns:
+            info_lines.append("")
+            info_lines.append("Pattern Match Details:")
+            for i, match in enumerate(self.matched_patterns[:8]):  # Limit to first 8 to avoid clutter
+                template_name = match['template_name'].replace('E_pattern_', '').replace('_', ' ')
+                info_lines.append(f"  {i+1}. {template_name} at Y={match['global_y']}")
+                info_lines.append(f"     Confidence: {match['confidence']:.3f}")
+            
+            if len(self.matched_patterns) > 8:
+                info_lines.append(f"  ... and {len(self.matched_patterns) - 8} more patterns")
+        
+        # Template matching info
+        info_lines.append("")
+        info_lines.append("Detection Parameters:")
+        info_lines.append(f"Match threshold: {self.match_threshold}")
+        info_lines.append(f"Max consecutive failures: {self.max_consecutive_failures}")
+        info_lines.append(f"Calibration: {self.pixels_per_cm:.2f} px/cm")
+        
+        # Create side panel layout
+        return self._add_side_panel_to_image(annotated_image, "E Pattern Detection", info_lines)
+    
+    def _add_side_panel_to_image(self, image, title, info_lines):
+        """Add side panel to image with title and info text."""
+        h, w = image.shape[:2]
+        
+        # Calculate panel width (30% of image width, minimum 350px, maximum 500px)
+        panel_width = max(350, min(500, int(w * 0.3)))
+        
+        # Calculate required panel height
+        line_height = 20
+        title_lines = 2  # Title + spacing
+        total_lines = title_lines + len(info_lines)
+        panel_height = max(h, total_lines * line_height + 40)  # Ensure minimum height matches image
+        
+        # Add gap between image and panel
+        gap_width = 10
+        total_width = w + gap_width + panel_width
+        
+        # Create combined image with side panel and gap
+        combined_image = np.zeros((panel_height, total_width, 3), dtype=np.uint8)
+        
+        # Copy original image to left side
+        combined_image[:h, :w] = image
+        
+        # Create black panel on the right side (after gap)
+        panel_start_x = w + gap_width
+        cv2.rectangle(combined_image, (panel_start_x, 0), (panel_start_x + panel_width, panel_height), (0, 0, 0), -1)
+        
+        # Add title to panel
+        title_y = 30
+        cv2.putText(combined_image, title, (panel_start_x + 10, title_y), cv2.FONT_HERSHEY_SIMPLEX,
+                   0.6, (255, 255, 255), 1, cv2.LINE_AA)
+        
+        # Add separator line
+        cv2.line(combined_image, (panel_start_x + 10, title_y + 10), (panel_start_x + panel_width - 10, title_y + 10), 
+                (100, 100, 100), 1)
+        
+        # Add info text lines
+        if info_lines:
+            start_y = title_y + 40
+            max_chars_per_line = max(1, (panel_width - 20) // 7)  # Estimate chars that fit in panel
+            
+            current_y = start_y
+            for line in info_lines:
+                if len(line) <= max_chars_per_line:
+                    cv2.putText(combined_image, line, (panel_start_x + 10, current_y), cv2.FONT_HERSHEY_SIMPLEX,
+                               0.4, (200, 200, 200), 1, cv2.LINE_AA)
+                    current_y += line_height
+                else:
+                    # Word wrap long lines
+                    words = line.split(' ')
+                    current_line = ""
+                    
+                    for word in words:
+                        test_line = current_line + (" " if current_line else "") + word
+                        if len(test_line) <= max_chars_per_line:
+                            current_line = test_line
+                        else:
+                            if current_line:
+                                cv2.putText(combined_image, current_line, (panel_start_x + 10, current_y), 
+                                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1, cv2.LINE_AA)
+                                current_y += line_height
+                                current_line = word
+                            else:
+                                # Single word too long, force break
+                                cv2.putText(combined_image, word[:max_chars_per_line], 
+                                           (panel_start_x + 10, current_y), cv2.FONT_HERSHEY_SIMPLEX, 0.4, 
+                                           (200, 200, 200), 1, cv2.LINE_AA)
+                                current_y += line_height
+                                current_line = word[max_chars_per_line:]
+                    
+                    # Add remaining text
+                    if current_line:
+                        cv2.putText(combined_image, current_line, (panel_start_x + 10, current_y), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1, cv2.LINE_AA)
+                        current_y += line_height
+        
+        return combined_image
     
     def get_detection_info(self):
         """Get information about the E-pattern detector."""
