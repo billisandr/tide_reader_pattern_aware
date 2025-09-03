@@ -154,10 +154,19 @@ def save_template(template, template_type, output_dir):
     if success:
         print(f"Template saved: {filepath}")
         
+        # Load configuration to get proper size value
+        config_path = Path('config.yaml')
+        if config_path.exists():
+            with open(config_path, 'r') as f:
+                config = yaml.safe_load(f)
+            single_e_cm = config.get('detection', {}).get('pattern_aware', {}).get('e_pattern_detection', {}).get('single_e_cm', 5.0)
+        else:
+            single_e_cm = 5.0  # Fallback value
+        
         # Save metadata
         metadata = {
             'template_type': template_type,
-            'size_cm': 5.0,  # E-templates represent 5cm markings
+            'size_cm': single_e_cm,  # E-templates represent configured cm markings
             'extraction_date': datetime.now().isoformat(),
             'dimensions': {
                 'width': template.shape[1],

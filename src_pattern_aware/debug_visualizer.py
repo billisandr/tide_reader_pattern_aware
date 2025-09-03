@@ -5,7 +5,6 @@ Provides comprehensive visual debugging with annotated images.
 
 import cv2
 import numpy as np
-import os
 import logging
 from pathlib import Path
 from datetime import datetime

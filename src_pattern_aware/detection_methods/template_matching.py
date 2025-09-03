@@ -10,7 +10,6 @@ import numpy as np
 import logging
 import os
 from pathlib import Path
-from scipy import ndimage
 
 class TemplateMatchingDetector:
     """
@@ -23,16 +22,14 @@ class TemplateMatchingDetector:
     4. Detect water interface in unmarked regions
     """
     
-    def __init__(self, config, template_manager):
+    def __init__(self, config):
         """
         Initialize template matching detector.
         
         Args:
             config: System configuration
-            template_manager: Template management instance (can be None - was stub implementation)
         """
         self.config = config
-        self.template_manager = template_manager
         self.logger = logging.getLogger(__name__)
         
         # Template matching configuration
@@ -163,18 +160,7 @@ class TemplateMatchingDetector:
             if local_templates:
                 self.logger.debug(f"Retrieved {len(local_templates)} local templates")
         
-        # Get templates from template manager (template manager removed - was stub implementation)
-        if self.template_source in ['manager', 'both'] and self.template_manager:
-            try:
-                # Template manager was stub implementation that always returned empty list
-                manager_templates = []  # Template manager was removed as it was non-functional stub
-                if manager_templates:
-                    templates.extend(manager_templates)
-                    self.logger.debug(f"Retrieved {len(manager_templates)} templates from manager")
-                else:
-                    self.logger.debug("Template manager was stub implementation - no templates available")
-            except Exception as e:
-                self.logger.warning(f"Failed to get templates from manager: {e}")
+        # Note: Template manager functionality was removed (was stub implementation)
         
         # Apply max_templates limit
         if len(templates) > self.max_templates:
@@ -649,11 +635,6 @@ class TemplateMatchingDetector:
     def get_detection_info(self):
         """Get information about the template matching detector."""
         local_template_count = len(self.templates)
-        manager_template_count = 0
-        
-        # Template manager was stub implementation that always returned 0
-        manager_template_count = 0  # Template manager was removed as it was non-functional stub
-        
         total_templates = len(self._get_templates())
         
         return {
@@ -662,7 +643,6 @@ class TemplateMatchingDetector:
             'match_threshold': self.match_threshold,
             'max_templates': self.max_templates,
             'local_templates': local_template_count,
-            'manager_templates': manager_template_count,
             'total_available_templates': total_templates,
             'templates_loaded': total_templates > 0,
             'use_default_templates': self.use_default_templates

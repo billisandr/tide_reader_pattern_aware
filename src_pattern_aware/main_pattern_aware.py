@@ -47,8 +47,7 @@ def select_detection_system(config):
     Priority:
     1. PATTERN_AWARE_MODE environment variable
     2. pattern_processing.mode configuration
-    3. detection.pattern_aware.enabled configuration
-    4. Default to 'standard'
+    3. Default to 'standard'
     
     Returns:
         str: 'standard', 'pattern_aware', or 'hybrid'
@@ -78,11 +77,7 @@ def select_detection_system(config):
         logger.info("Configuration set to pattern_processing.mode=hybrid")
         return 'hybrid'
     
-    # Check pattern_aware.enabled flag
-    pattern_aware = config.get('detection', {}).get('pattern_aware', {})
-    if pattern_aware.get('enabled', False):
-        logger.info("Pattern-aware detection enabled in configuration")
-        return 'pattern_aware'
+    # Note: Removed pattern_aware.enabled fallback - use pattern_processing.mode instead
     
     # Default to standard detection
     logger.info("Using standard detection system (default)")

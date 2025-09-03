@@ -7,7 +7,6 @@ numbers, and repetitive patterns using multiple pattern recognition techniques.
 
 import cv2
 import numpy as np
-import os
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -95,7 +94,7 @@ class PatternWaterDetector:
         # Template Matching Detector
         if self.pattern_config.get('template_matching', {}).get('enabled', True):
             self.detection_methods['template_matching'] = TemplateMatchingDetector(
-                self.config, None
+                self.config
             )
         
         # Morphological Detector
@@ -137,12 +136,7 @@ class PatternWaterDetector:
             confidence = self.enhanced_calibration_data.get('confidence', 'unknown')
             self.logger.info(f"Using enhanced calibration: {method} (confidence: {confidence})")
         
-        # Check for existing templates (template manager removed - stub functionality)
-        template_count = 0  # Template manager was stub implementation returning 0
-        if template_count > 0:
-            self.logger.info(f"Loaded {template_count} existing scale marking templates")
-        else:
-            self.logger.info("No existing templates found - will extract from calibration data")
+        self.logger.info("Template loading handled by individual detectors")
     
     def process_image(self, image_path):
         """
@@ -505,8 +499,7 @@ class PatternWaterDetector:
             template_count = 0  # Template manager was stub implementation returning 0
             
             if self.save_templates:
-                # Template saving was stub implementation - no action needed
-                self.logger.info(f"Template extraction was stub implementation (extracted: {template_count})")
+                self.logger.info("Template saving handled by individual detectors")
             
             return template_count
             

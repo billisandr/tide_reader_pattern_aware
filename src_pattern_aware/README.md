@@ -924,7 +924,7 @@ python -c "
 from src_pattern_aware.detection_methods.template_matching import TemplateMatchingDetector
 import cv2, yaml
 with open('config.yaml') as f: config = yaml.safe_load(f)
-detector = TemplateMatchingDetector(config, None)
+detector = TemplateMatchingDetector(config)
 print(detector.get_detection_info())
 "
 
@@ -996,7 +996,7 @@ detection:
 # Test individual detection methods
 def test_template_matching_detector():
     config = load_test_config()
-    detector = TemplateMatchingDetector(config, None)
+    detector = TemplateMatchingDetector(config)
     result = detector.detect_waterline(test_scale_region)
     assert result is not None
     assert 0 <= result < test_scale_region.shape[0]

@@ -6,7 +6,6 @@ fallback and comparison capabilities.
 """
 
 import logging
-from datetime import datetime
 from pathlib import Path
 
 class HybridDetector:

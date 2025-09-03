@@ -97,7 +97,6 @@ detection:
   
   # NEW: Pattern-aware detection system
   pattern_aware:
-    enabled: true                   # Enable pattern-aware detection (fallback if pattern_processing.mode not set)
     engine: 'integrated_pattern'      # Pattern detection engine
     fallback_to_standard: true        # Fall back to standard methods if pattern fails
     
