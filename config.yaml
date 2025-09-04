@@ -250,4 +250,5 @@ debug:
       - 'pattern_water_detection'           # Final pattern-based water line detection
       - 'waterline_verification_analysis'   # Hybrid waterline verification process
       - 'waterline_gradient_analysis'       # Gradient analysis debug visualization
-      - 'waterline_suspicious_regions'      # Suspicious regions identified by pattern analysis
+      - 'waterline_gradient_analysis_clean' # Gradient image without annotations
+      - 'waterline_candidate_regions'      # Suspicious regions identified by pattern analysis

@@ -105,7 +105,7 @@ class HybridWaterlineAnalyzer:
             candidate_regions = self._analyze_pattern_continuity(e_pattern_matches)
             
             # Step 2: Analyze gradients in candidate regions  
-            gradient_candidates = self._analyze_gradient_transitions(scale_region, candidate_regions)
+            gradient_candidates = self._analyze_gradient_transitions(scale_region, candidate_regions, image_path)
             
             # Step 3: Select best waterline candidate
             analysis_result = self._select_best_waterline(
@@ -358,7 +358,8 @@ class HybridWaterlineAnalyzer:
     
     def _analyze_gradient_transitions(self, 
                                     scale_region: np.ndarray, 
-                                    candidate_regions: List[Tuple[int, int, str, float]]) -> List[Tuple[int, float]]:
+                                    candidate_regions: List[Tuple[int, int, str, float]],
+                                    image_path: Optional[str] = None) -> List[Tuple[int, float]]:
         """
         Analyze gradient transitions in waterline candidate regions with enforced waterline positioning.
         
@@ -375,6 +376,24 @@ class HybridWaterlineAnalyzer:
             gray = scale_region.copy()
         
         waterline_candidates = []
+        
+        # Prepare gradient analysis data for logging
+        gradient_analysis_data = {
+            'image_path': image_path,
+            'regions': [],
+            'overall_gradient_profile': None,
+            'overall_gradient_differences': None
+        }
+        
+        # Calculate overall gradient profile for the entire image for logging
+        if self.debug_enabled and image_path:
+            grad_y_full = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=self.gradient_kernel_size)
+            grad_magnitude_full = np.abs(grad_y_full)
+            gradient_profile_full = np.mean(grad_magnitude_full, axis=1)
+            gradient_diff_full = np.diff(gradient_profile_full) if len(gradient_profile_full) > 1 else np.array([])
+            
+            gradient_analysis_data['overall_gradient_profile'] = gradient_profile_full
+            gradient_analysis_data['overall_gradient_differences'] = gradient_diff_full
         
         # Since we've fixed suspicious regions to only be BELOW last_good_y, 
         # the constraint is simpler: waterline must be at or below last_good_y
@@ -426,6 +445,19 @@ class HybridWaterlineAnalyzer:
             # Get gradient profile (average per row) - this shows Y-axis transitions
             gradient_profile = np.mean(grad_magnitude, axis=1)
             
+            # Store region gradient data for logging
+            region_data = {
+                'y_start': y_start,
+                'y_end': y_end,
+                'reason': reason,
+                'region_confidence': region_confidence,
+                'gradient_profile': gradient_profile.copy() if self.debug_enabled and image_path else None,
+                'gradient_differences': np.diff(gradient_profile) if len(gradient_profile) > 1 and self.debug_enabled and image_path else None,
+                'candidates_found': []
+            }
+            if self.debug_enabled and image_path:
+                gradient_analysis_data['regions'].append(region_data)
+            
             # Find transitions
             if len(gradient_profile) > 1:
                 gradient_diff = np.diff(gradient_profile)
@@ -455,6 +487,16 @@ class HybridWaterlineAnalyzer:
                         final_confidence = min(gradient_confidence, 1.0)
                         waterline_candidates.append((waterline_y, final_confidence))
                         
+                        # Store candidate info in region data for logging
+                        if self.debug_enabled and image_path and gradient_analysis_data['regions']:
+                            gradient_analysis_data['regions'][-1]['candidates_found'].append({
+                                'y_position': waterline_y,
+                                'confidence': final_confidence,
+                                'local_gradient': local_gradient,
+                                'surrounding_variance': surrounding_variance,
+                                'gradient_diff_value': gradient_diff[i]
+                            })
+                        
                         self.logger.debug(f"Valid gradient transition at Y={waterline_y}, confidence: {final_confidence:.3f}")
         
         # Sort by confidence and remove duplicates
@@ -463,6 +505,10 @@ class HybridWaterlineAnalyzer:
         
         if min_allowed_y is not None and sorted_candidates:
             self.logger.info(f"Found {len(sorted_candidates)} valid waterline candidates below first anomaly")
+        
+        # Save detailed gradient analysis to text file
+        if self.debug_enabled and image_path and self.debug_viz:
+            self._save_gradient_analysis_text_file(gradient_analysis_data, sorted_candidates)
         
         return sorted_candidates
     
@@ -564,7 +610,7 @@ class HybridWaterlineAnalyzer:
             )
             
             # Create detailed info text for side panel
-            suspicious_info_lines = [
+            candidate_info_lines = [
                 f"Analysis Result: {analysis_result['reason']}",
                 f"Confidence: {analysis_result['confidence']:.3f}",
                 f"E-patterns analyzed: {len(e_pattern_matches)}",
@@ -587,7 +633,7 @@ class HybridWaterlineAnalyzer:
                 underwater_buffer = average_pattern_height * self.underwater_buffer_percentage
                 buffered_constraint = last_good_y - underwater_buffer if last_good_y else None
                 
-                suspicious_info_lines.extend([
+                candidate_info_lines.extend([
                     "",
                     "Pattern Sequence Analysis:",
                     f"  Consecutive good patterns: {consecutive_patterns}",
@@ -599,7 +645,7 @@ class HybridWaterlineAnalyzer:
             
             # Add details for each suspicious region
             for i, (y_min, y_max, reason, confidence) in enumerate(suspicious_regions):
-                suspicious_info_lines.extend([
+                candidate_info_lines.extend([
                     f"Region {i+1}:",
                     f"  Y-range: {y_min:.1f} - {y_max:.1f}",
                     f"  Reason: {reason.replace('_', ' ')}",
@@ -607,8 +653,8 @@ class HybridWaterlineAnalyzer:
                 ])
             
             self.debug_viz.save_debug_image(
-                suspicious_regions_image, 'waterline_suspicious_regions',
-                info_text='\n'.join(suspicious_info_lines)
+                suspicious_regions_image, 'waterline_candidate_regions',
+                info_text='\n'.join(candidate_info_lines)
             )
             
             # 2. Save gradient analysis visualization
@@ -642,6 +688,13 @@ class HybridWaterlineAnalyzer:
             self.debug_viz.save_debug_image(
                 gradient_analysis_image, 'waterline_gradient_analysis',
                 info_text='\n'.join(gradient_info_lines)
+            )
+            
+            # 2b. Save clean gradient analysis visualization (without annotations)
+            clean_gradient_analysis_image = self._create_clean_gradient_analysis_visualization(scale_region)
+            self.debug_viz.save_debug_image(
+                clean_gradient_analysis_image, 'waterline_gradient_analysis_clean',
+                info_text=None
             )
             
             # 3. Create verification analysis summary
@@ -805,6 +858,30 @@ class HybridWaterlineAnalyzer:
         
         return combined
     
+    def _create_clean_gradient_analysis_visualization(self,
+                                                    scale_region: np.ndarray) -> np.ndarray:
+        """Create clean gradient analysis visualization without annotations."""
+        if len(scale_region.shape) == 3:
+            gray = cv2.cvtColor(scale_region, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = scale_region.copy()
+        
+        # Calculate Y-axis gradients for waterline detection visualization  
+        grad_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=self.gradient_kernel_size)
+        grad_magnitude = np.abs(grad_y)
+        
+        # Normalize for visualization
+        grad_vis = cv2.normalize(grad_magnitude, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+        grad_color = cv2.applyColorMap(grad_vis, cv2.COLORMAP_JET)
+        
+        # Create side-by-side comparison without any annotations
+        combined = np.hstack([
+            cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR),
+            grad_color
+        ])
+        
+        return combined
+    
     def _create_verification_summary_image(self,
                                          scale_region: np.ndarray,
                                          e_pattern_matches: List[Dict[str, Any]],
@@ -860,3 +937,166 @@ class HybridWaterlineAnalyzer:
                            cv2.FONT_HERSHEY_SIMPLEX, 0.3, (128, 128, 255), 1)
         
         return summary_image
+    
+    def _save_gradient_analysis_text_file(self, gradient_analysis_data: Dict[str, Any], sorted_candidates: List[Tuple[int, float]]):
+        """
+        Save detailed gradient analysis data to a text file in the waterline_gradient_analysis directory.
+        """
+        try:
+            from datetime import datetime
+            from pathlib import Path
+            import os
+            
+            # Extract image name from path
+            image_path = gradient_analysis_data.get('image_path', 'unknown_image')
+            if image_path:
+                image_name = Path(image_path).stem
+            else:
+                image_name = 'unknown_image'
+            
+            # Use debug visualizer's session directory to maintain consistency
+            if hasattr(self.debug_viz, 'session_dir') and self.debug_viz.session_dir:
+                base_debug_dir = self.debug_viz.session_dir
+            else:
+                # Fallback to creating our own directory
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                base_debug_dir = Path("data/debug") / f"pattern_aware_debug_session_{timestamp}"
+            
+            # Create waterline_gradient_analysis subdirectory
+            gradient_debug_dir = Path(base_debug_dir) / "waterline_gradient_analysis"
+            gradient_debug_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Create text file name
+            text_file_name = f"{image_name}_waterline_gradient_analysis.txt"
+            text_file_path = gradient_debug_dir / text_file_name
+            
+            # Prepare analysis content
+            content_lines = []
+            content_lines.append("=" * 80)
+            content_lines.append(f"WATERLINE GRADIENT ANALYSIS REPORT")
+            content_lines.append(f"Image: {image_name}")
+            content_lines.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            content_lines.append("=" * 80)
+            content_lines.append("")
+            
+            # Overall gradient analysis
+            content_lines.append("OVERALL IMAGE GRADIENT ANALYSIS:")
+            content_lines.append("-" * 50)
+            
+            overall_profile = gradient_analysis_data.get('overall_gradient_profile')
+            overall_differences = gradient_analysis_data.get('overall_gradient_differences')
+            
+            if overall_profile is not None and overall_differences is not None:
+                content_lines.append(f"Image height: {len(overall_profile)} pixels")
+                content_lines.append(f"Gradient kernel size: {self.gradient_kernel_size}")
+                content_lines.append(f"Gradient threshold: {self.gradient_threshold}")
+                content_lines.append("")
+                
+                content_lines.append("GRADIENT DIFFERENCES BY Y POSITION:")
+                content_lines.append("Y_Position\tGradient_Value\tGradient_Difference\tAbove_Threshold")
+                content_lines.append("-" * 70)
+                
+                for y_pos in range(len(overall_profile)):
+                    gradient_value = overall_profile[y_pos]
+                    
+                    # Get gradient difference (if available)
+                    if y_pos < len(overall_differences):
+                        grad_diff = overall_differences[y_pos]
+                        above_threshold = "YES" if abs(grad_diff) > self.gradient_threshold else "NO"
+                    else:
+                        grad_diff = 0.0
+                        above_threshold = "N/A"
+                    
+                    content_lines.append(f"{y_pos:8d}\t{gradient_value:14.3f}\t{grad_diff:17.3f}\t{above_threshold:>13}")
+                
+                content_lines.append("")
+                content_lines.append("SUMMARY STATISTICS:")
+                content_lines.append(f"  Max gradient value: {np.max(overall_profile):.3f}")
+                content_lines.append(f"  Min gradient value: {np.min(overall_profile):.3f}")
+                content_lines.append(f"  Mean gradient value: {np.mean(overall_profile):.3f}")
+                content_lines.append(f"  Std gradient value: {np.std(overall_profile):.3f}")
+                
+                if len(overall_differences) > 0:
+                    content_lines.append(f"  Max gradient difference: {np.max(np.abs(overall_differences)):.3f}")
+                    content_lines.append(f"  Positions above threshold: {np.sum(np.abs(overall_differences) > self.gradient_threshold)}")
+                
+                content_lines.append("")
+            else:
+                content_lines.append("Overall gradient analysis data not available.")
+                content_lines.append("")
+            
+            # Region-specific analysis
+            content_lines.append("REGION-SPECIFIC GRADIENT ANALYSIS:")
+            content_lines.append("-" * 50)
+            
+            regions = gradient_analysis_data.get('regions', [])
+            for i, region in enumerate(regions):
+                content_lines.append(f"\nREGION {i+1}:")
+                content_lines.append(f"  Y Range: {region['y_start']} - {region['y_end']}")
+                content_lines.append(f"  Reason: {region['reason']}")
+                content_lines.append(f"  Region Confidence: {region['region_confidence']:.3f}")
+                
+                region_profile = region.get('gradient_profile')
+                region_differences = region.get('gradient_differences')
+                
+                if region_profile is not None and region_differences is not None:
+                    content_lines.append(f"  Region height: {len(region_profile)} pixels")
+                    content_lines.append("")
+                    content_lines.append(f"  Region Gradient Details (Y positions {region['y_start']}-{region['y_end']}):")
+                    content_lines.append("  Y_Pos\tGradient_Value\tGradient_Difference\tAbove_Threshold")
+                    content_lines.append("  " + "-" * 65)
+                    
+                    for j in range(len(region_profile)):
+                        y_global = region['y_start'] + j
+                        gradient_value = region_profile[j]
+                        
+                        if j < len(region_differences):
+                            grad_diff = region_differences[j]
+                            above_threshold = "YES" if abs(grad_diff) > self.gradient_threshold else "NO"
+                        else:
+                            grad_diff = 0.0
+                            above_threshold = "N/A"
+                        
+                        content_lines.append(f"  {y_global:5d}\t{gradient_value:14.3f}\t{grad_diff:17.3f}\t{above_threshold:>13}")
+                
+                # Add candidate information
+                candidates = region.get('candidates_found', [])
+                if candidates:
+                    content_lines.append(f"\n  WATERLINE CANDIDATES FOUND IN THIS REGION:")
+                    for j, candidate in enumerate(candidates):
+                        content_lines.append(f"    Candidate {j+1}:")
+                        content_lines.append(f"      Y Position: {candidate['y_position']}")
+                        content_lines.append(f"      Confidence: {candidate['confidence']:.3f}")
+                        content_lines.append(f"      Local Gradient: {candidate['local_gradient']:.3f}")
+                        content_lines.append(f"      Surrounding Variance: {candidate['surrounding_variance']:.3f}")
+                        content_lines.append(f"      Gradient Diff Value: {candidate['gradient_diff_value']:.3f}")
+                else:
+                    content_lines.append(f"\n  No waterline candidates found in this region.")
+            
+            # Final candidates summary
+            content_lines.append("")
+            content_lines.append("FINAL WATERLINE CANDIDATES:")
+            content_lines.append("-" * 50)
+            if sorted_candidates:
+                content_lines.append("Rank\tY_Position\tConfidence")
+                content_lines.append("-" * 30)
+                for i, (y_pos, confidence) in enumerate(sorted_candidates):
+                    content_lines.append(f"{i+1:4d}\t{y_pos:10d}\t{confidence:10.3f}")
+            else:
+                content_lines.append("No valid waterline candidates found.")
+            
+            content_lines.append("")
+            content_lines.append("=" * 80)
+            content_lines.append("END OF ANALYSIS")
+            content_lines.append("=" * 80)
+            
+            # Write to file
+            with open(text_file_path, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(content_lines))
+            
+            self.logger.info(f"Saved detailed gradient analysis to: {text_file_path}")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to save gradient analysis text file: {e}")
+            import traceback
+            self.logger.error(f"Traceback: {traceback.format_exc()}")

@@ -92,8 +92,9 @@ class DebugVisualizer:
         if annotations:
             debug_image = self._apply_annotations(debug_image, annotations)
         
-        # Add info text and title in side panel
-        debug_image = self._add_side_panel(debug_image, step_name, info_text)
+        # Add info text and title in side panel (skip for clean steps)
+        if step_name != 'waterline_gradient_analysis_clean':
+            debug_image = self._add_side_panel(debug_image, step_name, info_text)
         
         # Save image
         filename = f"{self.current_image_name}_{step_name}.jpg"

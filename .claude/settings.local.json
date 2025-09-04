@@ -1,19 +1,30 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python test:*)",
-      "Read(/C:\\tide-level-img-proc-backup\\src_pattern_aware/**)",
-      "Read(/C:\\tide-level-img-proc-backup\\documentation/**)",
       "Read(/C:\\tide-level-img-proc-backup\\src_pattern_aware/**)",
       "Read(/C:\\tide-level-img-proc-backup\\src_pattern_aware/**)",
       "Read(/C:\\tide-level-img-proc-backup\\src_pattern_aware/**)",
       "Read(/C:\\tide-level-img-proc-backup\\src_pattern_aware/**)",
       "Read(/C:\\tide-level-img-proc-backup\\src_pattern_aware/**)",
+      "Bash(python:*)",
+      "Read(/C:\\tide-level-img-proc-backup\\data\\debug\\pattern_aware_debug_session_20250904_170339\\waterline_gradient_analysis/**)",
+      "Read(/C:\\tide-level-img-proc-backup\\src_pattern_aware/**)",
+      "Read(/C:\\tide-level-img-proc-backup\\src_pattern_aware/**)",
+      "Read(/C:\\tide-level-img-proc-backup\\src_pattern_aware/**)",
+      "Read(/C:\\tide-level-img-proc-backup\\src_pattern_aware/**)",
+      "Read(/C:\\tide-level-img-proc-backup\\data\\debug\\pattern_aware_debug_session_20250904_172133/**)",
+      "Read(/C:\\tide-level-img-proc-backup\\data\\debug\\pattern_aware_debug_session_20250904_172133/**)",
+      "Read(/C:\\tide-level-img-proc-backup\\data\\debug\\pattern_aware_debug_session_20250904_172133/**)",
+      "Read(/C:\\tide-level-img-proc-backup\\data\\debug\\pattern_aware_debug_session_20250904_172133/**)",
+      "Read(/C:\\tide-level-img-proc-backup\\data\\debug\\pattern_aware_debug_session_20250904_172133/**)",
+      "Read(/C:\\tide-level-img-proc-backup\\data\\debug\\pattern_aware_debug_session_20250904_172133/**)",
       "Read(/C:\\tide-level-img-proc-backup\\src_pattern_aware/**)",
       "Read(/C:\\tide-level-img-proc-backup/**)",
       "Read(/C:\\tide-level-img-proc-backup/**)",
-      "Read(/C:\\tide-level-img-proc-backup/**)",
-      "Read(/C:\\tide-level-img-proc-backup/**)"
+      "Read(/C:\\tide-level-img-proc-backup\\data\\debug\\pattern_aware_debug_session_20250904_174458/**)",
+      "Read(/C:\\tide-level-img-proc-backup\\data\\debug\\pattern_aware_debug_session_20250904_174458\\waterline_gradient_analysis/**)",
+      "Read(/C:\\tide-level-img-proc-backup\\data\\debug\\pattern_aware_debug_session_20250904_174458\\waterline_gradient_analysis_clean/**)",
+      "Read(/C:\\tide-level-img-proc-backup\\src_pattern_aware/**)"
     ],
     "deny": [],
     "ask": []
