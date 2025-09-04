@@ -87,27 +87,79 @@ class IntegratedPatternDetector:
                 if result is not None:
                     self.logger.info(f"E-pattern detection successful: Y={result}")
                     
-                    # Debug: Save E-pattern result
+                    # OPTIONAL: Run hybrid waterline verification as post-processing enhancement
+                    final_result = result
+                    final_confidence = 0.9
+                    hybrid_analysis_result = None
+                    
+                    # Check if hybrid verification is enabled
+                    verification_config = self.config.get('detection', {}).get('pattern_aware', {}).get('waterline_verification', {})
+                    if verification_config.get('enabled', False):
+                        try:
+                            from ..hybrid_integration import analyze_e_pattern_waterline, apply_hybrid_waterline_improvement
+                            
+                            self.logger.info("Running optional hybrid waterline verification")
+                            
+                            # Perform hybrid analysis
+                            hybrid_analysis_result = analyze_e_pattern_waterline(
+                                config=self.config,
+                                scale_region=scale_region,
+                                e_pattern_detector=self.e_pattern_detector,
+                                original_waterline_y=result,
+                                image_path=image_path,
+                                debug_viz=self.debug_viz,
+                                logger=self.logger
+                            )
+                            
+                            # Apply improvement if warranted
+                            final_result = apply_hybrid_waterline_improvement(
+                                original_waterline_y=result,
+                                hybrid_analysis_result=hybrid_analysis_result,
+                                logger=self.logger
+                            )
+                            
+                            # Update confidence based on hybrid analysis
+                            if hybrid_analysis_result.get('analysis_performed', False):
+                                if hybrid_analysis_result['reason'] == 'improved_detection':
+                                    final_confidence = min(0.95, 0.9 + hybrid_analysis_result.get('confidence', 0) * 0.1)
+                                elif hybrid_analysis_result['reason'] == 'confirmed_original':
+                                    final_confidence = min(0.95, 0.9 + 0.05)  # Slight boost for confirmation
+                            
+                        except Exception as e:
+                            self.logger.warning(f"Hybrid waterline verification failed: {e}")
+                            # Continue with original result
+                    
+                    # Debug: Save E-pattern result (with optional hybrid improvement)
                     if self.debug_viz:
                         debug_image = scale_region.copy()
                         if len(debug_image.shape) == 2:
                             debug_image = cv2.cvtColor(debug_image, cv2.COLOR_GRAY2BGR)
                         
                         # Draw detected water line
-                        cv2.line(debug_image, (0, result), (debug_image.shape[1], result), (0, 0, 255), 3)
-                        cv2.putText(debug_image, f"E-Pattern Sequential: Y={result}", (10, result-15), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                        color = (0, 0, 255) if final_result == result else (255, 0, 255)  # Red or magenta if improved
+                        cv2.line(debug_image, (0, final_result), (debug_image.shape[1], final_result), color, 3)
+                        
+                        # Add label showing if hybrid improvement was applied
+                        label = "E-Pattern Sequential"
+                        if final_result != result:
+                            label += f" + Hybrid (Δ={abs(final_result - result)}px)"
+                        label += f": Y={final_result}"
+                        
+                        cv2.putText(debug_image, label, (10, final_result-15), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
                         
                         self.debug_viz.save_debug_image(
                             debug_image, 'pattern_e_pattern_result',
-                            info_text=f"E-pattern sequential detection: water line at Y={result}"
+                            info_text=f"E-pattern detection (final): Y={final_result}, original: Y={result}"
                         )
                     
-                    # Return immediately on successful E-pattern detection
+                    # Return result (original or hybrid-improved)
                     return {
-                        'y_position': result,
-                        'method': 'e_pattern_sequential',
-                        'confidence': 0.9  # High confidence for E-pattern detection
+                        'y_position': final_result,
+                        'method': 'e_pattern_sequential' + ('_hybrid_enhanced' if final_result != result else ''),
+                        'confidence': final_confidence,
+                        'original_y_position': result,
+                        'hybrid_analysis': hybrid_analysis_result
                     }
                 else:
                     self.logger.warning("E-pattern detection failed, falling back to other methods")

@@ -104,16 +104,16 @@ detection:
     e_pattern_detection:
       enabled: true                   # Enable E-pattern sequential detector
       single_e_cm: 5.0                # E_pattern_black/white correspond to 5 cm
-      match_threshold: 0.75         # Template matching threshold for E-patterns
-      max_consecutive_failures: 5    # Stop after N failures (likely reached water)
-      support_flipped: true           # Support 180-degree flipped patterns
+      match_threshold: 0.7           # Template matching threshold for E-patterns
+      max_consecutive_failures: 6     # Stop after N failures (likely reached water)
+      support_flipped: false          # Support 180-degree flipped patterns
     
     # Pattern recognition settings
     template_matching:
       enabled: true
-      threshold: 0.75                  # Template match confidence
+      threshold: 0.75                 # Template match confidence
       max_templates: 10               # Maximum templates to store
-      template_source: 'manager'        # Options: 'local', 'manager', 'both'
+      template_source: 'manager'      # Options: 'local', 'manager', 'both'
       use_default_templates: true     # Create default stadia rod templates
       
       # Advanced template matching settings
@@ -153,6 +153,28 @@ detection:
       enabled: true
       min_aspect_ratio: 10            # Minimum width/height ratio
       min_width_ratio: 0.5            # Minimum width (% of scale width)
+    
+    # Hybrid waterline verification system
+    waterline_verification:
+      enabled: true                   # Enable hybrid waterline verification
+      min_pattern_confidence: 0.7     # Minimum confidence for waterline detection
+      gradient_kernel_size: 3         # Sobel kernel size for gradient analysis
+      gradient_threshold: 20          # Threshold for significant gradient changes
+      transition_search_height: 20    # Search height around suspicious regions (pixels)
+      
+      # Pattern analysis thresholds (used for both consecutive pattern detection and anomaly detection)
+      pattern_analysis:
+        # Consecutive good pattern detection thresholds
+        scale_consistency_threshold: 0.15    # Scale factor consistency for consecutive good patterns (±15%)
+        size_consistency_threshold: 0.20     # Size consistency for consecutive good patterns (±25%) 
+        spacing_consistency_threshold: 0.1  # Spacing consistency for consecutive good patterns (±50%)
+        min_consecutive_patterns: 1          # Minimum consecutive good patterns required
+        
+        # Anomaly detection thresholds (applied after establishing baseline)
+        scale_anomaly_threshold: 0.15        # Scale factor change to flag suspicious regions (±15%)
+        size_anomaly_threshold: 0.20         # Size change to flag suspicious regions (±20%)
+        aspect_ratio_anomaly_threshold: 0.20 # Aspect ratio change to flag suspicious regions (±20%)
+        max_gap_ratio: 0.5                   # Max gap between patterns (2x expected spacing)
 
 processing:
   # Image processing settings
@@ -222,3 +244,6 @@ debug:
       - 'pattern_contour_result'            # Contour analysis results
       - 'pattern_methods_summary'           # Summary of all pattern method results
       - 'pattern_water_detection'           # Final pattern-based water line detection
+      - 'waterline_verification_analysis'   # Hybrid waterline verification process
+      - 'waterline_gradient_analysis'       # Gradient analysis debug visualization
+      - 'waterline_suspicious_regions'      # Suspicious regions identified by pattern analysis

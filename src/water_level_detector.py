@@ -2074,71 +2074,112 @@ class WaterLevelDetector:
     
     def save_processed_image_enhanced(self, image, result, water_line_y, scale_top_y, scale_bottom_y, adjusted_pixels_per_cm, processing_time, image_path):
         """
-        Save image with annotations showing detected water line and measurements.
-        Enhanced version that handles both successful and failed detections.
+        Save image with clean annotations and side panel information.
+        Enhanced version that uses side panel format for decluttered display.
         """
+        import numpy as np
+        
+        # Create clean annotated image (no text overlays on main image)
         annotated = image.copy()
         
+        # Draw only essential visual annotations on the main image
         # Draw water line (green if successful, red if failed)
         if water_line_y is not None:
             color = (0, 255, 0) if result else (0, 0, 255)  # Green for success, red for failure
             cv2.line(annotated, 
                     (0, water_line_y), 
                     (image.shape[1], water_line_y),
-                    color, 2)
+                    color, 3)
         
         # Draw scale bounds if detected
         if scale_top_y is not None and scale_bottom_y is not None:
-            # Draw horizontal lines for scale bounds
+            # Draw clean horizontal lines for scale bounds
             cv2.line(annotated, (0, scale_top_y), (image.shape[1], scale_top_y), (255, 0, 0), 2)  # Blue for scale top
             cv2.line(annotated, (0, scale_bottom_y), (image.shape[1], scale_bottom_y), (255, 0, 0), 2)  # Blue for scale bottom
         
-        # Add text with measurements or error information
-        y_offset = 30
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 0.7
+        # Create side panel with comprehensive information
+        status = "success" if result else "failed"
+        info_lines = []
         
         if result:
-            # Successful detection
-            text = f"Water Level: {result['water_level_cm']:.1f}cm"
-            cv2.putText(annotated, text, (10, y_offset), font, font_scale, (0, 255, 0), 2)
-            y_offset += 30
+            # Success information
+            info_lines = [
+                "STANDARD DETECTION SUCCESS",
+                "",
+                f"Water Level: {result['water_level_cm']:.1f} cm",
+                f"Scale Above Water: {result['scale_above_water_cm']:.1f} cm",
+                f"Water Line Y: {water_line_y} px",
+                "",
+                "Detection Details:",
+                f"  Method: {self.detection_method}",
+                f"  Confidence: {result.get('confidence', 0.0):.3f}",
+                "",
+                "Scale Information:",
+                f"  Adjusted pixels per cm: {adjusted_pixels_per_cm:.2f}",
+                f"  Scale height: {self.config['scale']['total_height']:.1f} cm"
+            ]
             
-            text = f"Scale Above Water: {result['scale_above_water_cm']:.1f}cm"
-            cv2.putText(annotated, text, (10, y_offset), font, font_scale, (255, 255, 0), 2)
-            y_offset += 30
-        else:
-            # Failed detection - show what was attempted
-            status_text = "DETECTION FAILED"
-            cv2.putText(annotated, status_text, (10, y_offset), font, font_scale, (0, 0, 255), 2)
-            y_offset += 30
-            
-            # Show what was detected/attempted
-            if water_line_y is not None:
-                text = f"Water line detected at Y={water_line_y}"
-                cv2.putText(annotated, text, (10, y_offset), font, font_scale*0.8, (255, 255, 255), 1)
-                y_offset += 25
-            else:
-                text = "No water line detected"
-                cv2.putText(annotated, text, (10, y_offset), font, font_scale*0.8, (255, 255, 255), 1)
-                y_offset += 25
-                
+            # Add scale bounds if detected
             if scale_top_y is not None and scale_bottom_y is not None:
-                text = f"Scale bounds: {scale_top_y}-{scale_bottom_y}"
-                cv2.putText(annotated, text, (10, y_offset), font, font_scale*0.8, (255, 255, 255), 1)
-                y_offset += 25
-            else:
-                text = "Scale bounds not detected"
-                cv2.putText(annotated, text, (10, y_offset), font, font_scale*0.8, (255, 255, 255), 1)
-                y_offset += 25
+                scale_height_px = scale_bottom_y - scale_top_y
+                scale_height_cm = scale_height_px / adjusted_pixels_per_cm
+                info_lines.extend([
+                    "",
+                    "Scale Bounds:",
+                    f"  Top Y: {scale_top_y} px",
+                    f"  Bottom Y: {scale_bottom_y} px", 
+                    f"  Height: {scale_height_px} px ({scale_height_cm:.1f} cm)"
+                ])
+        else:
+            # Failure information
+            info_lines = [
+                "STANDARD DETECTION FAILED",
+                "",
+                "Detection Attempt:",
+                f"  Method: {self.detection_method}",
+                f"  Water line detected: {'Yes' if water_line_y is not None else 'No'}",
+                f"  Scale bounds detected: {'Yes' if scale_top_y and scale_bottom_y else 'No'}",
+                "",
+                "System Information:",
+                f"  Adjusted pixels per cm: {adjusted_pixels_per_cm:.2f}",
+                f"  Scale height: {self.config['scale']['total_height']:.1f} cm"
+            ]
+            
+            # Add specific detection details
+            if water_line_y is not None:
+                info_lines.extend([
+                    "",
+                    "Partial Detection:",
+                    f"  Water line Y: {water_line_y} px"
+                ])
+            
+            if scale_top_y is not None and scale_bottom_y is not None:
+                info_lines.extend([
+                    f"  Scale top Y: {scale_top_y} px",
+                    f"  Scale bottom Y: {scale_bottom_y} px"
+                ])
         
-        # Add processing info
-        text = f"Processing time: {processing_time:.2f}s"
-        cv2.putText(annotated, text, (10, y_offset), font, font_scale*0.6, (200, 200, 200), 1)
-        y_offset += 20
+        # Add common processing information
+        info_lines.extend([
+            "",
+            "Processing Information:",
+            f"  Processing time: {processing_time:.2f} seconds",
+            f"  Image: {Path(image_path).name}",
+            f"  Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            f"  System: Standard detection"
+        ])
         
-        text = f"Pixels/cm: {adjusted_pixels_per_cm:.2f}"
-        cv2.putText(annotated, text, (10, y_offset), font, font_scale*0.6, (200, 200, 200), 1)
+        # Add detection parameters
+        info_lines.extend([
+            "",
+            "Detection Parameters:",
+            f"  Edge thresholds: {self.edge_low}-{self.edge_high}",
+            f"  Blur kernel: {self.blur_kernel}",
+            f"  Min contour area: {self.config['detection']['min_contour_area']}"
+        ])
+        
+        # Create image with side panel
+        final_image = self._add_side_panel_to_output(annotated, status.upper(), info_lines)
         
         # Save annotated image using configured format
         image_format = self.config['processing'].get('image_format', 'jpg')
@@ -2151,16 +2192,92 @@ class WaterLevelDetector:
         annotated_dir.mkdir(parents=True, exist_ok=True)
         
         # Include success/failure status in filename
-        status = "success" if result else "failed"
         image_name = Path(image_path).stem  # Get filename without extension
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         output_path = annotated_dir / f"annotated_{status}_{image_name}_{timestamp}{image_format}"
-        success = cv2.imwrite(str(output_path), annotated)
+        success = cv2.imwrite(str(output_path), final_image)
         
         if success:
             self.logger.debug(f"Saved processed image: {output_path}")
         else:
             self.logger.warning(f"Failed to save processed image: {output_path}")
+
+    def _add_side_panel_to_output(self, image, title, info_lines):
+        """Add side panel to output image using the same format as debug visualizer."""
+        h, w = image.shape[:2]
+        
+        # Calculate panel width (30% of image width, minimum 300px, maximum 500px)
+        panel_width = max(300, min(500, int(w * 0.3)))
+        
+        # Calculate required panel height
+        line_height = 20
+        title_lines = 2  # Title + spacing
+        total_lines = title_lines + len(info_lines)
+        panel_height = max(h, total_lines * line_height + 40)  # Ensure minimum height matches image
+        
+        # Add gap between image and panel
+        gap_width = 10
+        total_width = w + gap_width + panel_width
+        
+        # Create combined image with side panel and gap
+        combined_image = np.zeros((panel_height, total_width, 3), dtype=np.uint8)
+        
+        # Copy original image to left side
+        combined_image[:h, :w] = image
+        
+        # Create black panel on the right side (after gap)
+        panel_start_x = w + gap_width
+        cv2.rectangle(combined_image, (panel_start_x, 0), (panel_start_x + panel_width, panel_height), (0, 0, 0), -1)
+        
+        # Add title to panel
+        title_y = 30
+        cv2.putText(combined_image, title, (panel_start_x + 10, title_y), cv2.FONT_HERSHEY_SIMPLEX,
+                   0.6, (255, 255, 255), 1, cv2.LINE_AA)
+        
+        # Add separator line
+        cv2.line(combined_image, (panel_start_x + 10, title_y + 10), (panel_start_x + panel_width - 10, title_y + 10), 
+                (100, 100, 100), 1)
+        
+        # Add info text lines
+        if info_lines:
+            start_y = title_y + 40
+            max_chars_per_line = max(1, (panel_width - 20) // 7)  # Estimate chars that fit in panel
+            
+            current_y = start_y
+            for line in info_lines:
+                if not line:  # Empty line for spacing
+                    current_y += line_height // 2
+                    continue
+                
+                # Word wrap long lines
+                if len(line) > max_chars_per_line:
+                    words = line.split(' ')
+                    current_line = ""
+                    
+                    for word in words:
+                        test_line = current_line + (" " if current_line else "") + word
+                        if len(test_line) <= max_chars_per_line:
+                            current_line = test_line
+                        else:
+                            if current_line:
+                                # Draw current line
+                                cv2.putText(combined_image, current_line, (panel_start_x + 10, current_y),
+                                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
+                                current_y += line_height
+                            current_line = word
+                    
+                    # Draw remaining text
+                    if current_line:
+                        cv2.putText(combined_image, current_line, (panel_start_x + 10, current_y),
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
+                        current_y += line_height
+                else:
+                    # Short line, draw normally
+                    cv2.putText(combined_image, line, (panel_start_x + 10, current_y),
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
+                    current_y += line_height
+        
+        return combined_image
 
     def save_processed_image(self, image, result):
         """

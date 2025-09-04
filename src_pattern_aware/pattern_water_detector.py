@@ -268,18 +268,20 @@ class PatternWaterDetector:
     
     def save_processed_image_enhanced(self, image, result, processing_time, image_path):
         """
-        Save image with pattern-aware annotations showing detected water line and measurements.
-        Enhanced version that handles both successful and failed detections.
+        Save image with clean pattern-aware annotations and side panel information.
+        Enhanced version that uses side panel format for decluttered display.
         """
         import cv2
+        import numpy as np
         from pathlib import Path
         from datetime import datetime
         
+        # Create clean annotated image (no text overlays on main image)
         annotated = image.copy()
         
-        # Draw annotations based on result
+        # Draw only essential visual annotations on the main image
         if result:
-            # Successful detection
+            # Successful detection - draw clean visual elements
             water_line_y = result.get('water_line_y')
             scale_bounds = result.get('scale_bounds', {})
             
@@ -287,7 +289,7 @@ class PatternWaterDetector:
             if water_line_y is not None:
                 cv2.line(annotated, (0, water_line_y), (image.shape[1], water_line_y), (0, 255, 0), 3)
             
-            # Draw scale bounds
+            # Draw scale bounds (clean rectangle)
             if scale_bounds:
                 x_min = scale_bounds.get('x_min', 0)
                 x_max = scale_bounds.get('x_max', image.shape[1])
@@ -296,68 +298,77 @@ class PatternWaterDetector:
                 
                 # Draw scale region rectangle
                 cv2.rectangle(annotated, (x_min, y_min), (x_max, y_max), (255, 0, 0), 2)
+        
+        # Create side panel with comprehensive information
+        status = "success" if result else "failed"
+        info_lines = []
+        
+        if result:
+            # Success information
+            info_lines = [
+                "PATTERN-AWARE DETECTION SUCCESS",
+                "",
+                f"Water Level: {result['water_level_cm']:.1f} cm",
+                f"Scale Above Water: {result['scale_above_water_cm']:.1f} cm",
+                f"Water Line Y: {result.get('water_line_y', 'N/A')} px",
+                "",
+                "Detection Details:",
+                f"  Engine: {result.get('pattern_engine', 'unknown')}",
+                f"  Method: {result.get('method', 'N/A')}",
+                f"  Confidence: {result.get('confidence', 0.0):.3f}",
+                "",
+                "Scale Information:",
+                f"  Pixels per cm: {self.pixels_per_cm:.2f}",
+                f"  Scale height: {self.config['scale']['total_height']:.1f} cm"
+            ]
             
-            # Add success text
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            y_offset = 30
+            # Add scale bounds if available
+            if result.get('scale_bounds'):
+                bounds = result['scale_bounds']
+                info_lines.extend([
+                    "",
+                    "Scale Region:",
+                    f"  X: {bounds.get('x_min', 0)}-{bounds.get('x_max', 0)} px",
+                    f"  Y: {bounds.get('y_min', 0)}-{bounds.get('y_max', 0)} px"
+                ])
             
-            text = f"PATTERN-AWARE SUCCESS"
-            cv2.putText(annotated, text, (10, y_offset), font, 0.8, (0, 255, 0), 2)
-            y_offset += 35
-            
-            text = f"Water Level: {result['water_level_cm']:.1f}cm"
-            cv2.putText(annotated, text, (10, y_offset), font, 0.7, (0, 255, 0), 2)
-            y_offset += 30
-            
-            text = f"Scale Above Water: {result['scale_above_water_cm']:.1f}cm"
-            cv2.putText(annotated, text, (10, y_offset), font, 0.7, (255, 255, 0), 2)
-            y_offset += 30
-            
-            text = f"Engine: {result.get('pattern_engine', 'unknown')}"
-            cv2.putText(annotated, text, (10, y_offset), font, 0.6, (255, 255, 255), 1)
-            y_offset += 25
-            
-            text = f"Confidence: {result.get('confidence', 0.0):.2f}"
-            cv2.putText(annotated, text, (10, y_offset), font, 0.6, (255, 255, 255), 1)
-            y_offset += 25
-            
+            # Add hybrid analysis info if available
+            if result.get('hybrid_analysis'):
+                hybrid = result['hybrid_analysis']
+                info_lines.extend([
+                    "",
+                    "Hybrid Analysis:",
+                    f"  Analysis performed: {hybrid.get('analysis_performed', False)}",
+                    f"  Reason: {hybrid.get('reason', 'N/A')}",
+                    f"  Confidence: {hybrid.get('confidence', 0.0):.3f}"
+                ])
+                
         else:
-            # Failed detection
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            y_offset = 30
-            
-            text = "PATTERN DETECTION FAILED"
-            cv2.putText(annotated, text, (10, y_offset), font, 0.8, (0, 0, 255), 2)
-            y_offset += 35
-            
-            # Show attempted pattern engine
-            text = f"Engine attempted: {self.pattern_engine}"
-            cv2.putText(annotated, text, (10, y_offset), font, 0.6, (255, 255, 255), 1)
-            y_offset += 25
-            
-            # Show fallback status
-            if self.fallback_enabled:
-                text = "Fallback to standard detection: enabled"
-                cv2.putText(annotated, text, (10, y_offset), font, 0.6, (255, 255, 255), 1)
-            else:
-                text = "Fallback to standard detection: disabled"
-                cv2.putText(annotated, text, (10, y_offset), font, 0.6, (255, 255, 255), 1)
-            y_offset += 25
+            # Failure information
+            info_lines = [
+                "PATTERN DETECTION FAILED",
+                "",
+                "Detection Attempt:",
+                f"  Engine attempted: {self.pattern_engine}",
+                f"  Fallback enabled: {'Yes' if self.fallback_enabled else 'No'}",
+                "",
+                "System Information:",
+                f"  Pixels per cm: {self.pixels_per_cm:.2f}",
+                f"  Scale height: {self.config['scale']['total_height']:.1f} cm"
+            ]
         
-        # Add processing info (common for both success/failure)
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        y_pos = image.shape[0] - 60
+        # Add common processing information
+        info_lines.extend([
+            "",
+            "Processing Information:",
+            f"  Processing time: {processing_time:.2f} seconds",
+            f"  Image: {Path(image_path).name}",
+            f"  Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            f"  System: Pattern-aware detection"
+        ])
         
-        text = f"Processing time: {processing_time:.2f}s"
-        cv2.putText(annotated, text, (10, y_pos), font, 0.5, (200, 200, 200), 1)
-        y_pos += 20
-        
-        text = f"Pixels/cm: {self.pixels_per_cm:.2f}"
-        cv2.putText(annotated, text, (10, y_pos), font, 0.5, (200, 200, 200), 1)
-        y_pos += 20
-        
-        text = f"Pattern-aware detection system"
-        cv2.putText(annotated, text, (10, y_pos), font, 0.5, (200, 200, 200), 1)
+        # Create image with side panel using the same approach as debug visualizer
+        final_image = self._add_side_panel_to_output(annotated, status.upper(), info_lines)
         
         # Save annotated image
         image_format = self.config['processing'].get('image_format', 'jpg')
@@ -369,14 +380,90 @@ class PatternWaterDetector:
         annotated_dir.mkdir(parents=True, exist_ok=True)
         
         # Include success/failure status in filename
-        status = "success" if result else "failed"
         output_path = annotated_dir / f"annotated_pattern_{status}_{datetime.now().strftime('%Y%m%d_%H%M%S')}{image_format}"
-        success = cv2.imwrite(str(output_path), annotated)
+        success = cv2.imwrite(str(output_path), final_image)
         
         if success:
             self.logger.debug(f"Saved pattern-aware annotated image: {output_path}")
         else:
             self.logger.warning(f"Failed to save pattern-aware annotated image: {output_path}")
+    
+    def _add_side_panel_to_output(self, image, title, info_lines):
+        """Add side panel to output image using the same format as debug visualizer."""
+        h, w = image.shape[:2]
+        
+        # Calculate panel width (30% of image width, minimum 300px, maximum 500px)
+        panel_width = max(300, min(500, int(w * 0.3)))
+        
+        # Calculate required panel height
+        line_height = 20
+        title_lines = 2  # Title + spacing
+        total_lines = title_lines + len(info_lines)
+        panel_height = max(h, total_lines * line_height + 40)  # Ensure minimum height matches image
+        
+        # Add gap between image and panel
+        gap_width = 10
+        total_width = w + gap_width + panel_width
+        
+        # Create combined image with side panel and gap
+        combined_image = np.zeros((panel_height, total_width, 3), dtype=np.uint8)
+        
+        # Copy original image to left side
+        combined_image[:h, :w] = image
+        
+        # Create black panel on the right side (after gap)
+        panel_start_x = w + gap_width
+        cv2.rectangle(combined_image, (panel_start_x, 0), (panel_start_x + panel_width, panel_height), (0, 0, 0), -1)
+        
+        # Add title to panel
+        title_y = 30
+        cv2.putText(combined_image, title, (panel_start_x + 10, title_y), cv2.FONT_HERSHEY_SIMPLEX,
+                   0.6, (255, 255, 255), 1, cv2.LINE_AA)
+        
+        # Add separator line
+        cv2.line(combined_image, (panel_start_x + 10, title_y + 10), (panel_start_x + panel_width - 10, title_y + 10), 
+                (100, 100, 100), 1)
+        
+        # Add info text lines
+        if info_lines:
+            start_y = title_y + 40
+            max_chars_per_line = max(1, (panel_width - 20) // 7)  # Estimate chars that fit in panel
+            
+            current_y = start_y
+            for line in info_lines:
+                if not line:  # Empty line for spacing
+                    current_y += line_height // 2
+                    continue
+                
+                # Word wrap long lines
+                if len(line) > max_chars_per_line:
+                    words = line.split(' ')
+                    current_line = ""
+                    
+                    for word in words:
+                        test_line = current_line + (" " if current_line else "") + word
+                        if len(test_line) <= max_chars_per_line:
+                            current_line = test_line
+                        else:
+                            if current_line:
+                                # Draw current line
+                                cv2.putText(combined_image, current_line, (panel_start_x + 10, current_y),
+                                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
+                                current_y += line_height
+                            current_line = word
+                    
+                    # Draw remaining text
+                    if current_line:
+                        cv2.putText(combined_image, current_line, (panel_start_x + 10, current_y),
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
+                        current_y += line_height
+                else:
+                    # Short line, draw normally
+                    cv2.putText(combined_image, line, (panel_start_x + 10, current_y),
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
+                    current_y += line_height
+        
+        return combined_image
     
     def _extract_scale_region(self, image):
         """Extract scale region using existing calibration data."""

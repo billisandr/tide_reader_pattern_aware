@@ -70,6 +70,7 @@ class EPatternDetector:
         
         # E-pattern specific settings
         self.single_e_cm = e_pattern_config.get('single_e_cm', 5.0)   # Each E-pattern represents 5 cm
+        self.support_flipped = e_pattern_config.get('support_flipped', False)  # Support 180-degree flipped patterns
         
         # Template directory
         self.template_dir = Path(config.get('pattern_processing', {}).get('template_directory', 
@@ -90,10 +91,25 @@ class EPatternDetector:
     
     def load_e_templates(self):
         """Load E-shaped templates at multiple scales for scale-invariant matching."""
-        template_files = {
-            'E_pattern_black': self.template_dir / 'E_pattern_black.png',
-            'E_pattern_white': self.template_dir / 'E_pattern_white.png'
-        }
+        # Automatically load all image files from template directory
+        if not self.template_dir.exists():
+            self.logger.warning(f"Template directory does not exist: {self.template_dir}")
+            return
+        
+        # Find all image files in template directory
+        image_extensions = ['.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.tif']
+        template_files = {}
+        
+        for image_file in self.template_dir.iterdir():
+            if image_file.is_file() and image_file.suffix.lower() in image_extensions:
+                template_name = image_file.stem  # Use filename without extension as template name
+                template_files[template_name] = image_file
+        
+        if not template_files:
+            self.logger.warning(f"No image files found in template directory: {self.template_dir}")
+            return
+        
+        self.logger.info(f"Found {len(template_files)} template files: {list(template_files.keys())}")
         
         # Define multiple scales to test (from very small to large)
         scale_factors = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.5, 2.0]
@@ -138,29 +154,32 @@ class EPatternDetector:
                             'scale_factor': scale
                         }
                         
-                        # Create and store 180-degree flipped version
-                        flipped_template = cv2.rotate(scaled_template, cv2.ROTATE_180)
-                        flipped_key = f"{template_name}_scale_{scale:.1f}_flipped"
-                        self.templates[flipped_key] = {
-                            'image': flipped_template,
-                            'original_image': cv2.rotate(original_template, cv2.ROTATE_180),
-                            'cm_value': self.single_e_cm,
-                            'priority': 1,
-                            'orientation': 'flipped_180',
-                            'path': template_path,
-                            'original_size': (orig_width, orig_height),
-                            'scaled_size': (scaled_width, scaled_height),
-                            'scale_factor': scale
-                        }
+                        # Create and store 180-degree flipped version (only if enabled)
+                        if self.support_flipped:
+                            flipped_template = cv2.rotate(scaled_template, cv2.ROTATE_180)
+                            flipped_key = f"{template_name}_scale_{scale:.1f}_flipped"
+                            self.templates[flipped_key] = {
+                                'image': flipped_template,
+                                'original_image': cv2.rotate(original_template, cv2.ROTATE_180),
+                                'cm_value': self.single_e_cm,
+                                'priority': 1,
+                                'orientation': 'flipped_180',
+                                'path': template_path,
+                                'original_size': (orig_width, orig_height),
+                                'scaled_size': (scaled_width, scaled_height),
+                                'scale_factor': scale
+                            }
                     
-                    self.logger.info(f"Created {len(scale_factors) * 2} template variants for {template_name}")
+                    variants_count = len(scale_factors) * (2 if self.support_flipped else 1)
+                    self.logger.info(f"Created {variants_count} template variants for {template_name} (flipped: {'enabled' if self.support_flipped else 'disabled'})")
                     
                 else:
                     self.logger.warning(f"Failed to load template: {template_path}")
             else:
                 self.logger.warning(f"Template file not found: {template_path}")
         
-        self.logger.info(f"Total templates loaded: {len(self.templates)} (multi-scale + flipped variants)")
+        orientation_info = "multi-scale + flipped variants" if self.support_flipped else "multi-scale variants only"
+        self.logger.info(f"Total templates loaded: {len(self.templates)} ({orientation_info})")
     
     def detect_waterline(self, scale_region, image_path=None):
         """
@@ -283,9 +302,14 @@ class EPatternDetector:
                         # Take the best match (highest confidence)
                         best_valid_match = max(valid_matches, key=lambda x: x['confidence'])
                         
-                        if best_match is None or best_valid_match['confidence'] > best_match['confidence']:
-                            best_match = best_valid_match
-                            best_template_height = template_img.shape[0]
+                        # Validate scale factor continuity to prevent underwater pattern matches
+                        if self._validate_scale_continuity(best_valid_match):
+                            if best_match is None or best_valid_match['confidence'] > best_match['confidence']:
+                                best_match = best_valid_match
+                                best_template_height = template_img.shape[0]
+                        else:
+                            self.logger.warning(f"Rejected {best_valid_match['template_name']} at Y={current_y} due to "
+                                              f"unrealistic scale change: {best_valid_match['scale_factor']:.1f}x")
             
             if best_match:
                 # Found a valid pattern at current position
@@ -348,13 +372,21 @@ class EPatternDetector:
             for pt in zip(*locations[::-1]):
                 confidence = result[pt[1], pt[0]]
                 
+                # Get scale factor and other template info
+                template_data = self.templates.get(template_name, {})
+                scale_factor = template_data.get('scale_factor', 1.0)
+                original_size = template_data.get('original_size', template.shape[::-1])
+                
                 match = {
                     'template_name': template_name,
                     'local_x': pt[0],
                     'local_y': pt[1],
                     'global_y': global_y + pt[1],
                     'confidence': confidence,
-                    'template_size': template.shape[::-1]  # (w, h)
+                    'template_size': template.shape[::-1],  # (w, h) - actual scaled size
+                    'scale_factor': scale_factor,
+                    'original_template_size': original_size,
+                    'center_y': global_y + pt[1] + template.shape[0] // 2
                 }
                 matches.append(match)
         
@@ -383,6 +415,52 @@ class EPatternDetector:
                             f"confidence: {match['confidence']:.3f}")
         
         return valid_matches
+    
+    def _validate_scale_continuity(self, candidate_match):
+        """
+        Validate that the scale factor of a new match is consistent with previous matches.
+        This prevents unrealistic scale changes that often indicate underwater artifacts.
+        
+        Args:
+            candidate_match: Match dictionary with scale_factor
+            
+        Returns:
+            bool: True if scale factor is acceptable, False otherwise
+        """
+        if len(self.matched_patterns) == 0:
+            # First match is always valid
+            return True
+            
+        candidate_scale = candidate_match['scale_factor']
+        
+        # Calculate baseline scale from first few matches
+        recent_matches = self.matched_patterns[-3:]  # Last 3 matches
+        recent_scales = [match['scale_factor'] for match in recent_matches]
+        
+        if len(recent_scales) == 0:
+            return True
+            
+        # Calculate average scale of recent matches
+        avg_recent_scale = sum(recent_scales) / len(recent_scales)
+        
+        # Calculate scale change ratio
+        scale_change_ratio = abs(candidate_scale - avg_recent_scale) / avg_recent_scale if avg_recent_scale > 0 else 0
+        
+        # Maximum allowed scale change (30% seems reasonable for legitimate patterns)
+        max_scale_change = 0.3
+        
+        # Special case: reject dramatic scale reductions that often indicate water artifacts
+        if candidate_scale < avg_recent_scale * 0.6:  # 40% or more reduction
+            self.logger.debug(f"Rejecting match due to dramatic scale reduction: {candidate_scale:.1f}x vs recent avg {avg_recent_scale:.1f}x")
+            return False
+        
+        # General scale change validation
+        if scale_change_ratio > max_scale_change:
+            self.logger.debug(f"Rejecting match due to excessive scale change: {scale_change_ratio:.2f} (max: {max_scale_change})")
+            return False
+            
+        self.logger.debug(f"Scale continuity OK: {candidate_scale:.1f}x (recent avg: {avg_recent_scale:.1f}x, change: {scale_change_ratio:.2f})")
+        return True
     
     def calculate_scale_above_water(self, water_line_y=None):
         """

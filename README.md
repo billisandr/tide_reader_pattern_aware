@@ -474,6 +474,30 @@ detection:
   # Color-based detection (HSV ranges for water) - used when method: 'color'
   water_hsv_lower: [100, 50, 50]   # Lower HSV bounds for water color detection
   water_hsv_upper: [130, 255, 255] # Upper HSV bounds for water color detection
+  
+  # Pattern-aware detection configuration (used with pattern_processing.mode: 'pattern_aware')
+  pattern_aware:
+    # Hybrid waterline verification system
+    waterline_verification:
+      enabled: true                   # Enable hybrid waterline verification
+      min_pattern_confidence: 0.7     # Minimum confidence for waterline detection
+      gradient_kernel_size: 3         # Sobel kernel size for gradient analysis
+      gradient_threshold: 10          # Threshold for significant gradient changes
+      transition_search_height: 20    # Search height around suspicious regions (pixels)
+      
+      # Consolidated pattern analysis thresholds
+      pattern_analysis:
+        # Consecutive good pattern detection thresholds
+        scale_consistency_threshold: 0.15    # Scale factor consistency for consecutive good patterns (±15%)
+        size_consistency_threshold: 0.25     # Size consistency for consecutive good patterns (±25%) 
+        spacing_consistency_threshold: 0.50  # Spacing consistency for consecutive good patterns (±50%)
+        min_consecutive_patterns: 3          # Minimum consecutive good patterns required
+        
+        # Anomaly detection thresholds (applied after establishing baseline)
+        scale_anomaly_threshold: 0.15        # Scale factor change to flag suspicious regions (±15%)
+        size_anomaly_threshold: 0.20         # Size change to flag suspicious regions (±20%)
+        aspect_ratio_anomaly_threshold: 0.20 # Aspect ratio change to flag suspicious regions (±20%)
+        max_gap_ratio: 2.0                   # Max gap between patterns (2x expected spacing)
 
 processing:
   # Image processing settings
@@ -1001,6 +1025,164 @@ scale_colors:
 ```
 
 The color detection can be **enabled/disabled per color** and includes **extensive debug visualization** showing mask generation, edge enhancement, and contour analysis.
+
+### Pattern Continuity Analysis Configuration
+
+**⚠️ NEW FEATURE**: Advanced pattern continuity analysis for E-pattern sequential detection with configurable thresholds.
+
+The pattern-aware detection system includes sophisticated **pattern continuity analysis** that ensures gradient analysis only runs after establishing a baseline of consecutive good patterns. This prevents false waterline detection from early pattern inconsistencies.
+
+#### How Pattern Continuity Analysis Works
+
+The system follows this logical sequence:
+
+1. **Consecutive Good Pattern Detection**: Analyzes E-patterns from top to bottom to find patterns with consistent scale factors, sizes, and spacing
+2. **Baseline Establishment**: Uses only the consecutive good patterns to calculate reliable baseline metrics  
+3. **Anomaly Detection**: Only analyzes patterns that come **after** the established good sequence
+4. **Gradient Analysis**: Performs water interface gradient analysis **only** in suspicious regions after good patterns
+
+#### Consolidated Pattern Analysis Configuration
+
+```yaml
+detection:
+  pattern_aware:
+    waterline_verification:
+      pattern_analysis:
+        # Consecutive good pattern detection thresholds
+        scale_consistency_threshold: 0.15    # Scale factor consistency (±15%)
+        size_consistency_threshold: 0.25     # Template size consistency (±25%) 
+        spacing_consistency_threshold: 0.50  # Pattern spacing consistency (±50%)
+        min_consecutive_patterns: 3          # Minimum consecutive patterns required
+        
+        # Anomaly detection thresholds (applied after establishing baseline)
+        scale_anomaly_threshold: 0.15        # Scale factor change to flag suspicious regions (±15%)
+        size_anomaly_threshold: 0.20         # Size change to flag suspicious regions (±20%)
+        aspect_ratio_anomaly_threshold: 0.20 # Aspect ratio change to flag suspicious regions (±20%)
+        max_gap_ratio: 2.0                   # Max gap between patterns (2x expected spacing)
+```
+
+#### Parameter Details
+
+**🎯 `scale_consistency_threshold` (Default: 0.15)**
+- **Purpose**: Controls scale factor consistency for consecutive good patterns
+- **Range**: 0.05 (very strict) to 0.30 (very lenient)
+- **Effect**: Lower values = stricter consecutive pattern requirements
+- **Example**: 0.15 means patterns with scale factors within ±15% of the first pattern are considered "good"
+- **Use Case**: 
+  - **Decrease to 0.10**: For very uniform scales with consistent pattern sizes
+  - **Increase to 0.20**: For scales with natural size variations or lighting changes
+
+**📏 `size_consistency_threshold` (Default: 0.25)**  
+- **Purpose**: Controls template size consistency for consecutive good patterns
+- **Range**: 0.10 (very strict) to 0.40 (very lenient)
+- **Effect**: Lower values = stricter size consistency requirements
+- **Example**: 0.25 means patterns with sizes within ±25% of the first pattern are considered "good"
+- **Use Case**:
+  - **Decrease to 0.15**: For scales with very uniform pattern sizes
+  - **Increase to 0.35**: For scales with perspective distortion or variable pattern sizes
+
+**📐 `spacing_consistency_threshold` (Default: 0.50)**
+- **Purpose**: Controls pattern spacing consistency for consecutive good patterns  
+- **Range**: 0.20 (very strict) to 0.80 (very lenient)
+- **Effect**: Lower values = stricter spacing consistency requirements
+- **Example**: 0.50 means pattern spacing within ±50% of average spacing is considered "good"
+- **Use Case**:
+  - **Decrease to 0.30**: For scales with very uniform pattern spacing
+  - **Increase to 0.70**: For scales with variable spacing or perspective effects
+
+**🔢 `min_consecutive_patterns` (Default: 3)**
+- **Purpose**: Minimum number of consecutive good patterns required before analyzing anomalies
+- **Range**: 2 to 6 patterns
+- **Effect**: Higher values = more reliable baseline but requires more visible patterns
+- **Example**: 3 means the system needs at least 3 consecutive good patterns to establish baseline
+- **Use Case**:
+  - **Decrease to 2**: For images with fewer visible patterns or partially submerged scales
+  - **Increase to 4-5**: For very high accuracy requirements with many visible patterns
+
+#### Configuration Examples
+
+**🔧 High Precision Setup** (Strict thresholds for laboratory conditions):
+```yaml
+pattern_analysis:
+  # Consecutive pattern detection (strict)
+  scale_consistency_threshold: 0.10    # Very strict scale consistency
+  size_consistency_threshold: 0.15     # Very strict size consistency  
+  spacing_consistency_threshold: 0.30  # Very strict spacing consistency
+  min_consecutive_patterns: 4          # Require 4 good patterns
+  
+  # Anomaly detection (strict)
+  scale_anomaly_threshold: 0.10        # Very strict scale anomaly detection
+  size_anomaly_threshold: 0.15         # Very strict size anomaly detection
+  aspect_ratio_anomaly_threshold: 0.15 # Very strict aspect anomaly detection
+  max_gap_ratio: 1.5                   # Stricter gap detection
+```
+
+**🌊 Field Conditions Setup** (Lenient thresholds for outdoor/variable conditions):
+```yaml
+pattern_analysis:
+  # Consecutive pattern detection (lenient)
+  scale_consistency_threshold: 0.20    # More lenient scale consistency
+  size_consistency_threshold: 0.30     # More lenient size consistency
+  spacing_consistency_threshold: 0.60  # More lenient spacing consistency  
+  min_consecutive_patterns: 2          # Require only 2 good patterns
+  
+  # Anomaly detection (lenient)
+  scale_anomaly_threshold: 0.20        # More lenient scale anomaly detection
+  size_anomaly_threshold: 0.25         # More lenient size anomaly detection
+  aspect_ratio_anomaly_threshold: 0.25 # More lenient aspect anomaly detection
+  max_gap_ratio: 3.0                   # More lenient gap detection
+```
+
+**🔬 Research Setup** (Balanced thresholds for scientific applications):
+```yaml
+pattern_analysis:
+  # Consecutive pattern detection (balanced)
+  scale_consistency_threshold: 0.12    # Moderately strict scale consistency
+  size_consistency_threshold: 0.20     # Moderately strict size consistency
+  spacing_consistency_threshold: 0.40  # Moderately strict spacing consistency
+  min_consecutive_patterns: 3          # Standard requirement
+  
+  # Anomaly detection (balanced)
+  scale_anomaly_threshold: 0.15        # Balanced scale anomaly detection
+  size_anomaly_threshold: 0.20         # Balanced size anomaly detection
+  aspect_ratio_anomaly_threshold: 0.20 # Balanced aspect anomaly detection
+  max_gap_ratio: 2.0                   # Standard gap detection
+```
+
+#### Troubleshooting Pattern Continuity
+
+**Problem**: "Only X consecutive good patterns found - insufficient for reliable waterline analysis"
+
+**Solutions**:
+- **Increase threshold values** to be more lenient with pattern variations
+- **Decrease `min_consecutive_patterns`** if fewer patterns are visible
+- **Check E-pattern templates** to ensure they match your scale markings
+- **Verify scale detection** is properly identifying the scale region
+
+**Problem**: Gradient analysis running too early (before actual water interface)
+
+**Solutions**:
+- **Decrease threshold values** to be stricter with pattern consistency
+- **Increase `min_consecutive_patterns`** to require more baseline patterns
+- **Check debug images** to see where consecutive patterns break
+
+**Problem**: System too strict, not detecting any waterline
+
+**Solutions**:
+- **Increase all threshold values** by 0.05-0.10 increments
+- **Decrease `min_consecutive_patterns`** to 2
+- **Enable debug mode** to see pattern continuity analysis results
+
+#### Debug Information
+
+When debug mode is enabled, the pattern continuity analysis provides:
+
+- **Console logging** showing where pattern sequences break
+- **Debug panel information** showing consecutive pattern count and baseline position  
+- **Visual annotations** distinguishing good patterns from anomalous patterns
+- **Threshold comparison details** for each pattern analyzed
+
+This advanced pattern continuity system ensures that waterline detection is physically consistent and only occurs after establishing reliable pattern baselines.
 
 ## Data Export Options
 
