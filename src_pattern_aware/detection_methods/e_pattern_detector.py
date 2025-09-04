@@ -227,6 +227,21 @@ class EPatternDetector:
             if water_line_y is not None:
                 self.logger.info(f"E-pattern detection successful: water line at Y={water_line_y}")
                 self.logger.info(f"Found {len(self.matched_patterns)} valid pattern matches before water")
+                
+                # Log pattern size and position summary
+                if self.matched_patterns:
+                    all_widths = [match.get('pattern_width_px', 0) for match in self.matched_patterns]
+                    all_heights = [match.get('pattern_height_px', 0) for match in self.matched_patterns]
+                    all_min_x = [match.get('pattern_min_x', 0) for match in self.matched_patterns]
+                    all_max_x = [match.get('pattern_max_x', 0) for match in self.matched_patterns]
+                    all_min_y = [match.get('pattern_min_y', 0) for match in self.matched_patterns]
+                    all_max_y = [match.get('pattern_max_y', 0) for match in self.matched_patterns]
+                    
+                    if all_widths and all_heights:
+                        self.logger.info(f"Pattern size ranges: width {min(all_widths)}-{max(all_widths)}px, "
+                                       f"height {min(all_heights)}-{max(all_heights)}px")
+                        self.logger.info(f"Pattern position bounds: X[{min(all_min_x)}-{max(all_max_x)}], "
+                                       f"Y[{min(all_min_y)}-{max(all_max_y)}]")
             else:
                 self.logger.warning("E-pattern detection failed to find water line")
             
@@ -386,7 +401,14 @@ class EPatternDetector:
                     'template_size': template.shape[::-1],  # (w, h) - actual scaled size
                     'scale_factor': scale_factor,
                     'original_template_size': original_size,
-                    'center_y': global_y + pt[1] + template.shape[0] // 2
+                    'center_y': global_y + pt[1] + template.shape[0] // 2,
+                    # Pattern size and position metrics (for info/debugging only)
+                    'pattern_width_px': template.shape[1],
+                    'pattern_height_px': template.shape[0],
+                    'pattern_min_x': pt[0],
+                    'pattern_max_x': pt[0] + template.shape[1],
+                    'pattern_min_y': global_y + pt[1],
+                    'pattern_max_y': global_y + pt[1] + template.shape[0]
                 }
                 matches.append(match)
         
@@ -623,6 +645,17 @@ class EPatternDetector:
                     f.write(f"    Confidence: {match['confidence']:.3f}\n")
                     f.write(f"    Template size: {match['template_size']}\n")
                     
+                    # Pattern size and position metrics
+                    width = match.get('pattern_width_px', 'N/A')
+                    height = match.get('pattern_height_px', 'N/A')
+                    min_x = match.get('pattern_min_x', 'N/A')
+                    max_x = match.get('pattern_max_x', 'N/A')
+                    min_y = match.get('pattern_min_y', 'N/A')
+                    max_y = match.get('pattern_max_y', 'N/A')
+                    f.write(f"    Pattern dimensions: {width} x {height} pixels\n")
+                    f.write(f"    Pattern X bounds: {min_x} to {max_x} pixels\n")
+                    f.write(f"    Pattern Y bounds: {min_y} to {max_y} pixels\n")
+                    
                     # Show scale information if available
                     if 'scale_factor' in match:
                         scale_factor = match['scale_factor']
@@ -694,17 +727,43 @@ class EPatternDetector:
             info_lines.append("")
             info_lines.append(f"Water line detected at Y = {water_line_y}")
         
+        # Pattern size and position summary
+        if self.matched_patterns:
+            # Calculate overall pattern metrics
+            all_widths = [match.get('pattern_width_px', 0) for match in self.matched_patterns]
+            all_heights = [match.get('pattern_height_px', 0) for match in self.matched_patterns]
+            all_min_x = [match.get('pattern_min_x', 0) for match in self.matched_patterns]
+            all_max_x = [match.get('pattern_max_x', 0) for match in self.matched_patterns]
+            all_min_y = [match.get('pattern_min_y', 0) for match in self.matched_patterns]
+            all_max_y = [match.get('pattern_max_y', 0) for match in self.matched_patterns]
+            
+            if all_widths and all_heights:
+                info_lines.append("")
+                info_lines.append("Pattern Size & Position Summary:")
+                info_lines.append(f"  Width range: {min(all_widths)}-{max(all_widths)} px")
+                info_lines.append(f"  Height range: {min(all_heights)}-{max(all_heights)} px")
+                info_lines.append(f"  X bounds: {min(all_min_x)} to {max(all_max_x)} px")
+                info_lines.append(f"  Y bounds: {min(all_min_y)} to {max(all_max_y)} px")
+        
         # Match details
         if self.matched_patterns:
             info_lines.append("")
             info_lines.append("Pattern Match Details:")
-            for i, match in enumerate(self.matched_patterns[:8]):  # Limit to first 8 to avoid clutter
+            for i, match in enumerate(self.matched_patterns[:6]):  # Reduced to 6 to make room for size info
                 template_name = match['template_name'].replace('E_pattern_', '').replace('_', ' ')
                 info_lines.append(f"  {i+1}. {template_name} at Y={match['global_y']}")
                 info_lines.append(f"     Confidence: {match['confidence']:.3f}")
+                # Add size and position info for each pattern (compact format)
+                width = match.get('pattern_width_px', 'N/A')
+                height = match.get('pattern_height_px', 'N/A')
+                min_x = match.get('pattern_min_x', 'N/A')
+                max_x = match.get('pattern_max_x', 'N/A')
+                min_y = match.get('pattern_min_y', 'N/A')
+                max_y = match.get('pattern_max_y', 'N/A')
+                info_lines.append(f"     Size: {width}x{height}px, X: {min_x}-{max_x}, Y: {min_y}-{max_y}")
             
-            if len(self.matched_patterns) > 8:
-                info_lines.append(f"  ... and {len(self.matched_patterns) - 8} more patterns")
+            if len(self.matched_patterns) > 6:
+                info_lines.append(f"  ... and {len(self.matched_patterns) - 6} more patterns")
         
         # Template matching info
         info_lines.append("")
