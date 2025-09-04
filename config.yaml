@@ -165,16 +165,20 @@ detection:
       # Pattern analysis thresholds (used for both consecutive pattern detection and anomaly detection)
       pattern_analysis:
         # Consecutive good pattern detection thresholds
-        scale_consistency_threshold: 0.10    # Scale factor consistency for consecutive good patterns (±15%)
-        size_consistency_threshold: 0.10     # Size consistency for consecutive good patterns (±25%) 
+        scale_consistency_threshold: 0.15    # Scale factor consistency for consecutive good patterns (±15%)
+        size_consistency_threshold: 0.15     # Size consistency for consecutive good patterns (±25%) 
         spacing_consistency_threshold: 0.10  # Spacing consistency for consecutive good patterns (±50%)
-        min_consecutive_patterns: 1          # Minimum consecutive good patterns required
+        min_consecutive_patterns: 0          # Minimum consecutive good patterns required
         
         # Anomaly detection thresholds (applied after establishing baseline)
-        scale_anomaly_threshold: 0.15        # Scale factor change to flag suspicious regions (±15%)
-        size_anomaly_threshold: 0.10         # Size change to flag suspicious regions (±20%)
+        scale_anomaly_threshold: 0.20        # Scale factor change to flag suspicious regions (±15%)
+        size_anomaly_threshold: 0.20         # Size change to flag suspicious regions (±20%)
         aspect_ratio_anomaly_threshold: 0.20 # Aspect ratio change to flag suspicious regions (±20%)
         max_gap_ratio: 0.5                   # Max gap between patterns (2x expected spacing)
+        
+        # Underwater buffer configuration - percentage of average pattern height to search above last_good_y
+        # This accounts for cases where last_good_y might be underwater
+        underwater_buffer_percentage: 0.6   # Buffer as % of avg pattern height (30% = 0.3)
 
 processing:
   # Image processing settings
@@ -184,7 +188,7 @@ processing:
 
 # NEW: Pattern-aware processing mode
 pattern_processing:
-  mode: 'pattern_aware'                    # Options: 'standard', 'pattern_aware', 'hybrid'
+  mode: 'pattern_aware'               # Options: 'standard', 'pattern_aware', 'hybrid'
   debug_patterns: true                # Save pattern analysis debug images
   save_templates: true                # Save extracted templates for reuse
   template_directory: 'data/pattern_templates/scale_markings'

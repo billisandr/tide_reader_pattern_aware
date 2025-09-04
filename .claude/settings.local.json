@@ -1,7 +1,19 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python test:*)"
+      "Bash(python test:*)",
+      "Read(/C:\\tide-level-img-proc-backup\\src_pattern_aware/**)",
+      "Read(/C:\\tide-level-img-proc-backup\\documentation/**)",
+      "Read(/C:\\tide-level-img-proc-backup\\src_pattern_aware/**)",
+      "Read(/C:\\tide-level-img-proc-backup\\src_pattern_aware/**)",
+      "Read(/C:\\tide-level-img-proc-backup\\src_pattern_aware/**)",
+      "Read(/C:\\tide-level-img-proc-backup\\src_pattern_aware/**)",
+      "Read(/C:\\tide-level-img-proc-backup\\src_pattern_aware/**)",
+      "Read(/C:\\tide-level-img-proc-backup\\src_pattern_aware/**)",
+      "Read(/C:\\tide-level-img-proc-backup/**)",
+      "Read(/C:\\tide-level-img-proc-backup/**)",
+      "Read(/C:\\tide-level-img-proc-backup/**)",
+      "Read(/C:\\tide-level-img-proc-backup/**)"
     ],
     "deny": [],
     "ask": []

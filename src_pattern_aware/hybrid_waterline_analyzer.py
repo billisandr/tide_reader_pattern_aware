@@ -63,6 +63,10 @@ class HybridWaterlineAnalyzer:
         self.aspect_ratio_anomaly_threshold = pattern_config.get('aspect_ratio_anomaly_threshold', 0.20)
         self.max_gap_ratio = pattern_config.get('max_gap_ratio', 2.0)
         
+        # Underwater buffer configuration - percentage of average pattern height to search above last_good_y
+        # This accounts for cases where last_good_y might be underwater
+        self.underwater_buffer_percentage = pattern_config.get('underwater_buffer_percentage', 0.3)
+        
         # Use debug visualizer's session directory if available
         self.debug_enabled = config.get('debug', {}).get('enabled', True) and debug_viz is not None
         
@@ -98,20 +102,20 @@ class HybridWaterlineAnalyzer:
         
         try:
             # Step 1: Analyze pattern continuity
-            suspicious_regions = self._analyze_pattern_continuity(e_pattern_matches)
+            candidate_regions = self._analyze_pattern_continuity(e_pattern_matches)
             
-            # Step 2: Analyze gradients in suspicious regions  
-            gradient_candidates = self._analyze_gradient_transitions(scale_region, suspicious_regions)
+            # Step 2: Analyze gradients in candidate regions  
+            gradient_candidates = self._analyze_gradient_transitions(scale_region, candidate_regions)
             
             # Step 3: Select best waterline candidate
             analysis_result = self._select_best_waterline(
-                suspicious_regions, gradient_candidates, original_waterline_y
+                candidate_regions, gradient_candidates, original_waterline_y
             )
             
             # Step 4: Save debug information if enabled
             if self.debug_enabled and self.debug_viz and image_path:
                 self._save_hybrid_debug_info(
-                    scale_region, e_pattern_matches, suspicious_regions, 
+                    scale_region, e_pattern_matches, candidate_regions, 
                     gradient_candidates, analysis_result, image_path
                 )
             
@@ -128,12 +132,17 @@ class HybridWaterlineAnalyzer:
     
     def _analyze_pattern_continuity(self, e_pattern_matches: List[Dict[str, Any]]) -> List[Tuple[int, int, str, float]]:
         """
-        Analyze E-pattern continuity to find suspicious regions ONLY after consecutive good patterns.
-        This ensures gradient analysis only runs where we expect water interface transitions.
+        Analyze E-pattern continuity to find waterline candidate regions around and below detected patterns.
+        This ensures gradient analysis covers the most probable waterline locations.
         
         Returns:
-            List of (y_min, y_max, reason, confidence) tuples for suspicious regions
+            List of (y_min, y_max, reason, confidence) tuples for waterline candidate regions
         """
+        # Handle edge case of no patterns
+        if not e_pattern_matches:
+            self.logger.warning("No E-patterns provided for analysis - cannot create scan regions")
+            return []
+        
         # Sort patterns by Y position
         sorted_patterns = sorted(e_pattern_matches, key=lambda p: p.get('center_y', p.get('global_y', 0)))
         
@@ -141,31 +150,41 @@ class HybridWaterlineAnalyzer:
         consecutive_good_patterns = self._find_consecutive_good_patterns(sorted_patterns)
         
         if consecutive_good_patterns < self.min_consecutive_patterns:
-            self.logger.warning(f"Only {consecutive_good_patterns} consecutive good patterns found - "
-                              f"insufficient for reliable waterline analysis (minimum: {self.min_consecutive_patterns})")
-            return []
+            self.logger.warning(f"Only {consecutive_good_patterns} consecutive good patterns found "
+                              f"(minimum: {self.min_consecutive_patterns}) - using available patterns for analysis")
+            # Even with fewer patterns, we should still create scan regions below the last pattern
+            # Use all available patterns as baseline
         
-        self.logger.info(f"Found {consecutive_good_patterns} consecutive good patterns - establishing baseline")
+        # Determine how many patterns to use for baseline
+        patterns_to_use = max(consecutive_good_patterns, 1)  # Use at least 1 pattern
+        patterns_to_use = min(patterns_to_use, len(sorted_patterns))  # Don't exceed available patterns
         
-        # STEP 2: Calculate baseline from consecutive good patterns ONLY
-        baseline_patterns = sorted_patterns[:consecutive_good_patterns]
+        self.logger.info(f"Using {patterns_to_use} patterns for baseline establishment")
+        
+        # STEP 2: Calculate baseline from available patterns  
+        baseline_patterns = sorted_patterns[:patterns_to_use]
         baseline_sizes = []
         baseline_aspects = []
         baseline_scales = []
+        baseline_heights = []
         
         for pattern in baseline_patterns:
             template_size = pattern.get('template_size', (20, 15))
             size = template_size[0] * template_size[1]
             aspect_ratio = template_size[1] / template_size[0] if template_size[0] > 0 else 1.0
             scale_factor = pattern.get('scale_factor', 1.0)
+            # Get pattern height for buffer calculations
+            pattern_height = pattern.get('pattern_height_px', template_size[1] if len(template_size) > 1 else 15)
             
             baseline_sizes.append(size)
             baseline_aspects.append(aspect_ratio)
             baseline_scales.append(scale_factor)
+            baseline_heights.append(pattern_height)
         
         baseline_size = np.median(baseline_sizes)
         baseline_aspect = np.median(baseline_aspects)
         baseline_scale = np.median(baseline_scales)
+        average_pattern_height = np.median(baseline_heights) if baseline_heights else 20.0
         
         # Calculate expected spacing from good patterns
         spacings = []
@@ -177,66 +196,69 @@ class HybridWaterlineAnalyzer:
         baseline_spacing = np.median(spacings) if spacings else 50.0
         
         # Position after which we expect anomalies to indicate water interface
-        last_good_pattern_y = baseline_patterns[-1].get('center_y', baseline_patterns[-1].get('global_y', 0))
+        # Use the BOTTOM of the last good pattern as the reference point
+        last_good_pattern = baseline_patterns[-1]
+        last_good_center_y = last_good_pattern.get('center_y', last_good_pattern.get('global_y', 0))
+        last_good_height = last_good_pattern.get('pattern_height_px', 
+                                               last_good_pattern.get('template_size', (20, 15))[1] if 
+                                               last_good_pattern.get('template_size', (20, 15)) else 15)
+        last_good_pattern_y = last_good_center_y + (last_good_height // 2)  # Bottom of last good pattern
         
         self.logger.info(f"Baseline established from {len(baseline_patterns)} patterns: "
                         f"Size={baseline_size:.0f}, Scale={baseline_scale:.2f}, Spacing={baseline_spacing:.1f}")
-        self.logger.info(f"Looking for water interface anomalies after Y={last_good_pattern_y}")
+        self.logger.info(f"Last good pattern bottom Y={last_good_pattern_y} (center: {last_good_center_y})")
+        self.logger.info(f"Will create systematic scan regions below LOWEST detected pattern")
         
-        # STEP 3: Find suspicious regions ONLY in patterns after the consecutive good series
-        suspicious_regions = []
-        first_anomaly_y = None
+        # STEP 3: Create systematic waterline candidate regions AROUND the lowest E-pattern baseline
+        # The most probable waterline location is around the baseline, not just strictly below it
         
-        # Only analyze patterns after the established good sequence
-        for i in range(consecutive_good_patterns, len(sorted_patterns)):
-            current = sorted_patterns[i]
-            current_y = current.get('center_y', current.get('global_y', 0))
+        candidate_regions = []
+        
+        # Find the LOWEST (highest Y value) pattern - this is our reference point
+        lowest_pattern = sorted_patterns[-1]  # Last in sorted list has highest Y
+        lowest_center_y = lowest_pattern.get('center_y', lowest_pattern.get('global_y', 0))
+        lowest_height = lowest_pattern.get('pattern_height_px', 
+                                         lowest_pattern.get('template_size', (20, 15))[1] if 
+                                         lowest_pattern.get('template_size', (20, 15)) else 15)
+        lowest_pattern_bottom_y = lowest_center_y + (lowest_height // 2)  # Bottom of lowest pattern
+        
+        # Calculate buffer for region around baseline
+        baseline_buffer = average_pattern_height * self.underwater_buffer_percentage
+        region_height = self.transition_search_height * 2  # Make regions larger for better gradient detection
+        
+        self.logger.info(f"Using LOWEST pattern at center Y={lowest_center_y}, bottom Y={lowest_pattern_bottom_y}")
+        self.logger.info(f"Creating candidate regions AROUND baseline with {baseline_buffer:.1f}px buffer")
+        
+        # MOST IMPORTANT: Create primary candidate region AROUND the baseline
+        # This covers the most probable waterline location: around the last detected pattern
+        primary_region_start = lowest_pattern_bottom_y - baseline_buffer  # Start ABOVE bottom of pattern
+        primary_region_end = lowest_pattern_bottom_y + baseline_buffer + region_height  # Extend well below
+        candidate_regions.append((primary_region_start, primary_region_end, "around_baseline", 1.0))
+        
+        # Create additional candidate regions extending further downward for completeness
+        current_scan_y = primary_region_end
+        region_count = 1
+        max_additional_regions = 2  # Fewer regions since primary region covers most probable area
+        
+        while region_count <= max_additional_regions:
+            next_region_y_min = current_scan_y
+            next_region_y_max = next_region_y_min + region_height
+            candidate_regions.append((next_region_y_min, next_region_y_max, f"extended_scan_{region_count}", 0.6))
             
-            # Skip patterns that come before our established baseline
-            if current_y <= last_good_pattern_y:
-                continue
-                
-            # Analyze this pattern for anomalies
-            anomaly_found, anomaly_type, confidence = self._check_pattern_anomaly(
-                current, baseline_size, baseline_aspect, baseline_scale, baseline_spacing
-            )
-            
-            if anomaly_found:
-                # Determine region bounds for gradient analysis
-                if i < len(sorted_patterns) - 1:
-                    next_pattern = sorted_patterns[i + 1]
-                    next_y = next_pattern.get('center_y', next_pattern.get('global_y', 0))
-                    y_max = next_y + self.transition_search_height
-                else:
-                    # Last pattern - extend search area downward
-                    y_max = current_y + self.transition_search_height * 2
-                
-                y_min = max(last_good_pattern_y, current_y - self.transition_search_height)
-                
-                suspicious_regions.append((y_min, y_max, anomaly_type, confidence))
-                
-                # Track first anomaly after good patterns
-                if first_anomaly_y is None:
-                    first_anomaly_y = current_y
-                
-                self.logger.info(f"Water interface anomaly detected at Y={current_y}: {anomaly_type} "
-                               f"(confidence: {confidence:.3f}) - enabling gradient analysis")
+            current_scan_y = next_region_y_max
+            region_count += 1
         
         # Store analysis results for waterline enforcement and debug info
-        self.first_anomaly_y = first_anomaly_y
-        self.last_good_pattern_y = last_good_pattern_y
-        self.consecutive_good_patterns = consecutive_good_patterns
+        self.first_anomaly_y = primary_region_start  # Primary candidate region start
+        self.last_good_pattern_y = lowest_pattern_bottom_y  # Use LOWEST pattern bottom as reference
+        self.consecutive_good_patterns = patterns_to_use  # Use actual patterns used, not consecutive count
+        self.average_pattern_height = average_pattern_height
         
-        if first_anomaly_y is not None:
-            self.logger.info(f"First water interface anomaly at Y={first_anomaly_y}")
-        else:
-            self.logger.info("No water interface anomalies detected after good pattern sequence")
+        self.logger.info(f"Created {len(candidate_regions)} waterline candidate regions")
+        self.logger.info(f"Primary region (around baseline): Y={primary_region_start:.1f} to Y={primary_region_end:.1f}")
+        self.logger.info(f"All regions cover Y={primary_region_start:.1f} to Y={current_scan_y:.1f}")
         
-        # Merge overlapping regions
-        merged_regions = self._merge_overlapping_regions(suspicious_regions)
-        self.logger.info(f"Found {len(merged_regions)} suspicious regions")
-        
-        return merged_regions
+        return candidate_regions
     
     def _find_consecutive_good_patterns(self, sorted_patterns: List[Dict[str, Any]]) -> int:
         """
@@ -309,40 +331,6 @@ class HybridWaterlineAnalyzer:
         
         return consecutive_count
     
-    def _check_pattern_anomaly(self, pattern: Dict[str, Any], baseline_size: float, 
-                             baseline_aspect: float, baseline_scale: float, 
-                             baseline_spacing: float) -> Tuple[bool, str, float]:
-        """
-        Check if a pattern shows anomalies compared to baseline.
-        
-        Returns:
-            Tuple of (anomaly_found, anomaly_type, confidence)
-        """
-        template_size = pattern.get('template_size', (20, 15))
-        size = template_size[0] * template_size[1]
-        aspect_ratio = template_size[1] / template_size[0] if template_size[0] > 0 else 1.0
-        scale_factor = pattern.get('scale_factor', 1.0)
-        
-        # Check scale factor anomalies (highest priority)
-        scale_change = abs(scale_factor - baseline_scale) / baseline_scale if baseline_scale > 0 else 0
-        if scale_change > self.scale_anomaly_threshold or scale_factor < baseline_scale * 0.7:
-            confidence = min(scale_change * 2, 1.0)
-            return True, "scale_factor_anomaly", confidence
-        
-        # Check size anomalies
-        size_change = abs(size - baseline_size) / baseline_size if baseline_size > 0 else 0
-        if size_change > self.size_anomaly_threshold:
-            confidence = min(size_change, 1.0)
-            return True, "size_anomaly", confidence
-        
-        # Check aspect ratio anomalies
-        aspect_change = abs(aspect_ratio - baseline_aspect) / baseline_aspect if baseline_aspect > 0 else 0
-        if aspect_change > self.aspect_ratio_anomaly_threshold:
-            confidence = min(aspect_change, 1.0)
-            return True, "aspect_ratio_change", confidence
-        
-        return False, "none", 0.0
-    
     def _merge_overlapping_regions(self, regions: List[Tuple[int, int, str, float]]) -> List[Tuple[int, int, str, float]]:
         """Merge overlapping suspicious regions."""
         if len(regions) <= 1:
@@ -370,14 +358,14 @@ class HybridWaterlineAnalyzer:
     
     def _analyze_gradient_transitions(self, 
                                     scale_region: np.ndarray, 
-                                    suspicious_regions: List[Tuple[int, int, str, float]]) -> List[Tuple[int, float]]:
+                                    candidate_regions: List[Tuple[int, int, str, float]]) -> List[Tuple[int, float]]:
         """
-        Analyze gradient transitions in suspicious regions with enforced waterline positioning.
+        Analyze gradient transitions in waterline candidate regions with enforced waterline positioning.
         
         Returns:
             List of (y_position, confidence) tuples for waterline candidates
         """
-        if not suspicious_regions:
+        if not candidate_regions:
             return []
         
         # Convert to grayscale if needed
@@ -388,42 +376,54 @@ class HybridWaterlineAnalyzer:
         
         waterline_candidates = []
         
-        # CRITICAL RULE: Waterline must be after last good pattern in sequence
+        # Since we've fixed suspicious regions to only be BELOW last_good_y, 
+        # the constraint is simpler: waterline must be at or below last_good_y
         last_good_y = getattr(self, 'last_good_pattern_y', None)
         first_anomaly_y = getattr(self, 'first_anomaly_y', None)
+        average_pattern_height = getattr(self, 'average_pattern_height', 20.0)
         
-        # Use the stricter constraint (last good pattern position)
-        min_allowed_y = last_good_y if last_good_y is not None else first_anomaly_y
+        # Calculate buffer: configurable percentage of average pattern height for edge cases
+        underwater_buffer = average_pattern_height * self.underwater_buffer_percentage
+        
+        # Since regions are now properly defined below last_good_y, use a more conservative constraint
+        if last_good_y is not None:
+            # Allow small buffer for measurement precision, but regions should already be below last_good_y
+            min_allowed_y = last_good_y - (underwater_buffer * 0.5)  # Reduced buffer since regions are corrected
+            constraint_desc = f"last good pattern Y={last_good_y} with reduced buffer (-{underwater_buffer * 0.5:.1f}px)"
+        else:
+            min_allowed_y = first_anomaly_y
+            constraint_desc = f"first anomaly Y={first_anomaly_y}"
         
         if min_allowed_y is not None:
-            self.logger.info(f"Enforcing waterline constraint: Y >= {min_allowed_y} "
-                           f"({'last good pattern' if last_good_y else 'first anomaly'} position)")
+            self.logger.info(f"Waterline constraint: Y >= {min_allowed_y:.1f} ({constraint_desc})")
+            self.logger.info(f"Regions now properly defined below last good pattern at Y={last_good_y}")
         
-        for y_min, y_max, reason, region_confidence in suspicious_regions:
-            self.logger.debug(f"Analyzing gradients in region Y={y_min}-{y_max} (reason: {reason})")
+        for y_min, y_max, reason, region_confidence in candidate_regions:
+            self.logger.debug(f"Analyzing gradients in candidate region Y={y_min}-{y_max} (reason: {reason})")
             
             # Extract region of interest
             y_start = max(0, int(y_min))
             y_end = min(gray.shape[0], int(y_max))
             
-            # ENFORCE: Only analyze regions at or below first anomaly
+            # ENFORCE: Only analyze regions at or below the buffered constraint
             if min_allowed_y is not None:
                 if y_end <= min_allowed_y:
-                    self.logger.debug(f"Skipping region Y={y_min}-{y_max} - entirely above first anomaly at Y={min_allowed_y}")
+                    self.logger.debug(f"Skipping region Y={y_min}-{y_max} - entirely above constraint at Y={min_allowed_y:.1f}")
                     continue
-                # Constrain region to be below first anomaly
-                y_start = max(y_start, min_allowed_y)
+                # Constrain region to be at or below the buffered position  
+                y_start = max(y_start, int(min_allowed_y))
             
             if y_end - y_start < 3:
                 continue
                 
             roi = gray[y_start:y_end, :]
             
-            # Calculate horizontal gradients
-            grad_x = cv2.Sobel(roi, cv2.CV_64F, 1, 0, ksize=self.gradient_kernel_size)
-            grad_magnitude = np.abs(grad_x)
+            # Calculate VERTICAL gradients (Y-axis changes) to detect horizontal waterline transitions
+            # This is correct for waterline detection: look for vertical color changes, not horizontal ones
+            grad_y = cv2.Sobel(roi, cv2.CV_64F, 0, 1, ksize=self.gradient_kernel_size)
+            grad_magnitude = np.abs(grad_y)
             
-            # Get gradient profile (average per row)
+            # Get gradient profile (average per row) - this shows Y-axis transitions
             gradient_profile = np.mean(grad_magnitude, axis=1)
             
             # Find transitions
@@ -436,21 +436,20 @@ class HybridWaterlineAnalyzer:
                         local_gradient = gradient_profile[i] if i < len(gradient_profile) else 0
                         surrounding_variance = np.var(gradient_profile[max(0, i-3):min(len(gradient_profile), i+4)])
                         
+                        # Base confidence on gradient strength and local variance
                         gradient_confidence = min(local_gradient / 100.0, 1.0) * min(surrounding_variance / 50.0, 1.0)
                         
-                        # Boost confidence based on region reason (scale factor anomalies are most reliable)
-                        if "scale_factor_anomaly" in reason:
-                            gradient_confidence *= 1.5  # Highest boost for scale anomalies
-                        elif "gap_detected" in reason:
-                            gradient_confidence *= 1.2
-                        elif "size_anomaly" in reason:
-                            gradient_confidence *= 1.1
+                        # Apply region-based confidence scaling
+                        if "post_pattern_search" in reason:
+                            gradient_confidence *= 1.2  # Higher confidence for first region below patterns
+                        elif "extended_scan" in reason:
+                            gradient_confidence *= 0.9  # Slightly lower confidence for extended regions
                         
                         waterline_y = y_start + i
                         
-                        # Final check: waterline must be below first anomaly
+                        # Final check: waterline must be at or below the buffered constraint
                         if min_allowed_y is not None and waterline_y < min_allowed_y:
-                            self.logger.debug(f"Rejected gradient candidate at Y={waterline_y} - above first anomaly")
+                            self.logger.debug(f"Rejected gradient candidate at Y={waterline_y} - above constraint Y={min_allowed_y:.1f}")
                             continue
                         
                         final_confidence = min(gradient_confidence, 1.0)
@@ -488,19 +487,27 @@ class HybridWaterlineAnalyzer:
         # Get best candidate
         best_y, best_confidence = gradient_candidates[0]
         
-        # Final validation: ensure waterline is after last good pattern
+        # Final validation: ensure waterline is after last good pattern 
+        # Since regions are now properly defined below last_good_y, use consistent reduced buffer
         last_good_y = getattr(self, 'last_good_pattern_y', None)
         first_anomaly_y = getattr(self, 'first_anomaly_y', None)
-        min_allowed_y = last_good_y if last_good_y is not None else first_anomaly_y
+        average_pattern_height = getattr(self, 'average_pattern_height', 20.0)
+        underwater_buffer = average_pattern_height * self.underwater_buffer_percentage
+        
+        if last_good_y is not None:
+            min_allowed_y = last_good_y - (underwater_buffer * 0.5)  # Same reduced buffer as gradient analysis
+            constraint_desc = f"buffered last good pattern Y={min_allowed_y:.1f} (original: {last_good_y}, reduced buffer)"
+        else:
+            min_allowed_y = first_anomaly_y
+            constraint_desc = f"first anomaly Y={min_allowed_y}"
         
         if min_allowed_y is not None and best_y < min_allowed_y:
-            constraint_type = 'last good pattern' if last_good_y else 'first anomaly'
-            self.logger.warning(f"Best waterline candidate Y={best_y} is above {constraint_type} Y={min_allowed_y} - rejecting")
+            self.logger.warning(f"Best waterline candidate Y={best_y} is above {constraint_desc} - rejecting")
             return {
                 'improved_waterline_y': original_waterline_y,
                 'confidence': 0.0,
                 'analysis_performed': True,
-                'reason': 'waterline_above_first_anomaly',
+                'reason': 'waterline_above_constraint',
                 'suspicious_regions': suspicious_regions,
                 'gradient_candidates': gradient_candidates
             }
@@ -567,20 +574,27 @@ class HybridWaterlineAnalyzer:
                 f"  Size anomaly threshold: {self.size_anomaly_threshold}",
                 f"  Aspect ratio anomaly threshold: {self.aspect_ratio_anomaly_threshold}",
                 f"  Max gap ratio: {self.max_gap_ratio}",
+                f"  Underwater buffer: {self.underwater_buffer_percentage:.1%}",
                 ""
             ]
             
             # Add pattern sequence analysis info
             consecutive_patterns = getattr(self, 'consecutive_good_patterns', 0)
             last_good_y = getattr(self, 'last_good_pattern_y', None)
+            average_pattern_height = getattr(self, 'average_pattern_height', 20.0)
             
             if consecutive_patterns > 0:
+                underwater_buffer = average_pattern_height * self.underwater_buffer_percentage
+                buffered_constraint = last_good_y - underwater_buffer if last_good_y else None
+                
                 suspicious_info_lines.extend([
                     "",
                     "Pattern Sequence Analysis:",
                     f"  Consecutive good patterns: {consecutive_patterns}",
                     f"  Last good pattern Y: {last_good_y}",
-                    f"  Analysis after Y: {last_good_y}"
+                    f"  Average pattern height: {average_pattern_height:.1f}px",
+                    f"  Underwater buffer: {underwater_buffer:.1f}px ({self.underwater_buffer_percentage:.1%})",
+                    f"  Buffered constraint Y: {buffered_constraint:.1f}" if buffered_constraint else "  No buffered constraint"
                 ])
             
             # Add details for each suspicious region
@@ -603,11 +617,21 @@ class HybridWaterlineAnalyzer:
             )
             
             # Create detailed gradient info
+            last_good_y = getattr(self, 'last_good_pattern_y', None)
+            average_pattern_height = getattr(self, 'average_pattern_height', 20.0)
+            underwater_buffer = average_pattern_height * self.underwater_buffer_percentage
+            buffered_constraint = last_good_y - underwater_buffer if last_good_y else None
+            
             gradient_info_lines = [
                 f"Gradient candidates found: {len(gradient_candidates)}",
                 f"Gradient threshold: {self.gradient_threshold}",
                 f"Kernel size: {self.gradient_kernel_size}",
                 f"Search height: {self.transition_search_height}px",
+                "",
+                "Waterline Constraints:",
+                f"  Last good pattern Y: {last_good_y}" if last_good_y else "  No last good pattern",
+                f"  Underwater buffer: {underwater_buffer:.1f}px ({self.underwater_buffer_percentage:.1%})" if last_good_y else "",
+                f"  Min allowed Y: {buffered_constraint:.1f}" if buffered_constraint else "  No Y constraint",
                 ""
             ]
             
@@ -639,12 +663,21 @@ class HybridWaterlineAnalyzer:
             if 'improvement_delta' in analysis_result:
                 summary_info_lines.append(f"Improvement delta: {analysis_result['improvement_delta']:.1f} pixels")
             
+            # Add buffer information to summary
+            last_good_y = getattr(self, 'last_good_pattern_y', None)
+            average_pattern_height = getattr(self, 'average_pattern_height', 20.0)
+            underwater_buffer = average_pattern_height * self.underwater_buffer_percentage if last_good_y else 0
+            
             summary_info_lines.extend([
                 "",
                 "Pattern Analysis:",
                 f"  E-patterns: {len(e_pattern_matches)}",
                 f"  Suspicious regions: {len(suspicious_regions)}",
-                f"  Gradient candidates: {len(gradient_candidates)}"
+                f"  Gradient candidates: {len(gradient_candidates)}",
+                "",
+                "Buffer Configuration:",
+                f"  Underwater buffer: {self.underwater_buffer_percentage:.1%} of pattern height",
+                f"  Buffer size: {underwater_buffer:.1f}px" if underwater_buffer > 0 else "  No buffer applied"
             ])
             
             self.debug_viz.save_debug_image(
@@ -734,9 +767,9 @@ class HybridWaterlineAnalyzer:
         else:
             gray = scale_region.copy()
         
-        # Calculate gradients
-        grad_x = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=self.gradient_kernel_size)
-        grad_magnitude = np.abs(grad_x)
+        # Calculate Y-axis gradients for waterline detection visualization  
+        grad_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=self.gradient_kernel_size)
+        grad_magnitude = np.abs(grad_y)
         
         # Normalize for visualization
         grad_vis = cv2.normalize(grad_magnitude, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)

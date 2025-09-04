@@ -392,6 +392,68 @@ detection:
 
 **Status:** FULLY IMPLEMENTED AND WORKING - Scale-invariant approach successful
 
+### Hybrid Waterline Analyzer (WORKING)
+
+**Purpose:** Post-process E-pattern detection results to improve waterline accuracy through systematic gradient analysis below the last detected pattern.
+
+**Key Innovation:** Replaces anomaly-based suspicious region detection with a systematic scanning approach that follows the correct physical waterline detection pipeline.
+
+**Correct Detection Pipeline:**
+
+1. **Step A: Detect Consecutive Valid E-Patterns**
+   - Use no-gap and no-significant scale/size deviation rules
+   - Establish baseline from consecutive good pattern sequence
+   - Determine bottom of last good pattern as reference point
+
+2. **Step B: Define First Suspect Region**  
+   - Start search at bottom of last valid E-pattern with configurable buffer
+   - Buffer accounts for cases where last pattern might be partially underwater
+   - Buffer = `underwater_buffer_percentage` × average pattern height
+
+3. **Step C: Create Systematic Scan Regions**
+   - Generate multiple search regions extending downward from first region
+   - Cover area systematically rather than relying on pattern anomalies
+   - Each region sized for effective gradient detection
+
+4. **Step D: Y-Axis Gradient Analysis**
+   - Use vertical gradients (Y-axis changes) to detect horizontal waterline transitions
+   - Apply Sobel operator: `cv2.Sobel(roi, cv2.CV_64F, 0, 1, ksize=kernel_size)`
+   - Focus on row-wise gradient changes that indicate water interface
+
+**Configuration:**
+
+```yaml
+detection:
+  pattern_aware:
+    waterline_verification:
+      enabled: true                           # Enable hybrid waterline analysis
+      min_pattern_confidence: 0.6             # Minimum confidence for accepting results
+      gradient_kernel_size: 3                 # Sobel operator kernel size
+      gradient_threshold: 30                  # Minimum gradient change threshold
+      transition_search_height: 20            # Height of each search region
+      pattern_analysis:
+        min_consecutive_patterns: 3           # Minimum consecutive good patterns needed
+        underwater_buffer_percentage: 0.3    # Buffer above last_good_y (30% of pattern height)
+```
+
+**Key Improvements Over Previous Approach:**
+
+- **Physical Accuracy**: Waterline search only occurs below established good patterns
+- **No Anomaly Dependence**: Doesn't require detecting anomalous patterns to define regions
+- **Systematic Coverage**: Scans complete area below last good pattern methodically  
+- **Correct Gradient Direction**: Uses Y-axis gradients for horizontal waterline detection
+- **Configurable Buffering**: Accounts for partially underwater patterns with user-tunable buffer
+
+**Debug Output:**
+- **Location**: Integrated with pattern-aware debug visualizer session directories
+- **Verification Analysis**: Shows systematic scan regions and gradient candidates
+- **Gradient Visualization**: Y-axis gradient magnitude with detected transitions
+- **Buffer Information**: Displays buffer calculations and constraint enforcement
+
+**Integration**: Automatically applied when E-pattern detection is used and at least 2 patterns are detected. Falls back to original E-pattern results if hybrid analysis fails.
+
+**Status:** FULLY IMPLEMENTED AND WORKING - Systematic scanning approach successful
+
 ### Morphological Detection (WORKING)
 
 **Purpose:** Separate horizontal water interfaces from vertical scale markings
