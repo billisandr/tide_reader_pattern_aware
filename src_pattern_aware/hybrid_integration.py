@@ -75,8 +75,11 @@ def analyze_e_pattern_waterline(config: Dict[str, Any],
                 'reason': 'insufficient_patterns'
             }
         
+        # Get pixels_per_cm from E-pattern detector for calibration conversion
+        pixels_per_cm = getattr(e_pattern_detector, 'pixels_per_cm', 2.0)
+        
         # Initialize hybrid analyzer with debug visualizer for session directory
-        analyzer = HybridWaterlineAnalyzer(config, debug_viz, logger)
+        analyzer = HybridWaterlineAnalyzer(config, debug_viz, logger, pixels_per_cm)
         
         # Perform analysis
         result = analyzer.analyze_e_pattern_results(

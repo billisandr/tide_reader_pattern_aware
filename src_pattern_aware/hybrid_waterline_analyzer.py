@@ -26,7 +26,7 @@ class HybridWaterlineAnalyzer:
     without modifying the original detection system.
     """
     
-    def __init__(self, config: Dict[str, Any], debug_viz=None, logger: Optional[logging.Logger] = None):
+    def __init__(self, config: Dict[str, Any], debug_viz=None, logger: Optional[logging.Logger] = None, pixels_per_cm: float = None):
         """
         Initialize the hybrid analyzer.
         
@@ -34,10 +34,12 @@ class HybridWaterlineAnalyzer:
             config: System configuration
             debug_viz: Debug visualizer instance (to use same session directory)
             logger: Optional logger instance
+            pixels_per_cm: Calibration data for pixel-to-cm conversion
         """
         self.config = config
         self.debug_viz = debug_viz
         self.logger = logger or logging.getLogger(__name__)
+        self.pixels_per_cm = pixels_per_cm or 2.0  # Default fallback
         
         # Hybrid verification settings - with safe defaults
         verification_config = config.get('detection', {}).get('pattern_aware', {}).get('waterline_verification', {})
@@ -46,6 +48,7 @@ class HybridWaterlineAnalyzer:
         self.min_confidence_threshold = verification_config.get('min_pattern_confidence', 0.6)
         self.gradient_kernel_size = verification_config.get('gradient_kernel_size', 3)
         self.gradient_threshold = verification_config.get('gradient_threshold', 30)
+        self.negative_gradient_threshold = verification_config.get('negative_gradient_threshold', 25)
         self.transition_search_height = verification_config.get('transition_search_height', 20)
         
         # Pattern analysis thresholds (consolidated configuration)
@@ -70,7 +73,40 @@ class HybridWaterlineAnalyzer:
         # Use debug visualizer's session directory if available
         self.debug_enabled = config.get('debug', {}).get('enabled', True) and debug_viz is not None
         
-        self.logger.info("Hybrid Waterline Analyzer initialized as independent post-processor")
+        self.logger.info(f"Hybrid Waterline Analyzer initialized as independent post-processor (pixels_per_cm: {self.pixels_per_cm:.2f})")
+    
+    def _pixel_to_cm(self, pixel_y: float) -> float:
+        """
+        Convert pixel Y coordinate to stadia rod reading in cm.
+        
+        Args:
+            pixel_y: Y coordinate in pixels
+            
+        Returns:
+            Stadia rod reading in cm
+        """
+        # For stadia rod: higher Y values = lower on scale = lower readings
+        # This is a simplified conversion - may need adjustment based on specific scale setup
+        scale_height_cm = self.config.get('scale', {}).get('total_height', 500.0)
+        scale_height_pixels = scale_height_cm * self.pixels_per_cm
+        
+        # Convert Y pixel to reading (inverted: top of image = highest reading)
+        reading_cm = scale_height_cm - (pixel_y / self.pixels_per_cm)
+        return reading_cm
+    
+    def _cm_to_pixel(self, cm_reading: float) -> float:
+        """
+        Convert stadia rod reading in cm to pixel Y coordinate.
+        
+        Args:
+            cm_reading: Stadia rod reading in cm
+            
+        Returns:
+            Y coordinate in pixels
+        """
+        scale_height_cm = self.config.get('scale', {}).get('total_height', 500.0)
+        pixel_y = (scale_height_cm - cm_reading) * self.pixels_per_cm
+        return pixel_y
     
     def analyze_e_pattern_results(self, 
                                 scale_region: np.ndarray,
@@ -458,12 +494,22 @@ class HybridWaterlineAnalyzer:
             if self.debug_enabled and image_path:
                 gradient_analysis_data['regions'].append(region_data)
             
-            # Find transitions
+            # Find transitions with improved negative gradient differential detection
             if len(gradient_profile) > 1:
                 gradient_diff = np.diff(gradient_profile)
                 
+                # Improved waterline detection: prioritize topmost negative gradient differential in first candidate region
+                is_first_region = "around_baseline" in reason
+                topmost_negative_found = False
+                
                 for i in range(1, len(gradient_diff) - 1):
-                    if abs(gradient_diff[i]) > self.gradient_threshold:
+                    gradient_diff_value = gradient_diff[i]
+                    
+                    # Check for significant gradient changes
+                    is_significant_change = abs(gradient_diff_value) > self.gradient_threshold
+                    is_negative_differential = gradient_diff_value < 0 and abs(gradient_diff_value) > self.negative_gradient_threshold
+                    
+                    if is_significant_change:
                         # Calculate confidence
                         local_gradient = gradient_profile[i] if i < len(gradient_profile) else 0
                         surrounding_variance = np.var(gradient_profile[max(0, i-3):min(len(gradient_profile), i+4)])
@@ -471,8 +517,19 @@ class HybridWaterlineAnalyzer:
                         # Base confidence on gradient strength and local variance
                         gradient_confidence = min(local_gradient / 100.0, 1.0) * min(surrounding_variance / 50.0, 1.0)
                         
-                        # Apply region-based confidence scaling
-                        if "post_pattern_search" in reason:
+                        # IMPROVED: Give highest priority to negative gradient differentials in first region
+                        if is_first_region and is_negative_differential:
+                            gradient_confidence *= 2.0  # Significantly boost confidence for negative differentials
+                            
+                            # If this is the topmost negative differential in first region, give it max priority
+                            if not topmost_negative_found:
+                                gradient_confidence *= 1.5  # Additional boost for topmost negative
+                                topmost_negative_found = True
+                                self.logger.info(f"Found topmost negative gradient differential at Y={y_start + i} "
+                                               f"(diff: {gradient_diff_value:.1f}, threshold: {self.negative_gradient_threshold})")
+                        
+                        # Apply region-based confidence scaling for non-negative differentials
+                        elif "around_baseline" in reason:
                             gradient_confidence *= 1.2  # Higher confidence for first region below patterns
                         elif "extended_scan" in reason:
                             gradient_confidence *= 0.9  # Slightly lower confidence for extended regions
@@ -484,20 +541,25 @@ class HybridWaterlineAnalyzer:
                             self.logger.debug(f"Rejected gradient candidate at Y={waterline_y} - above constraint Y={min_allowed_y:.1f}")
                             continue
                         
-                        final_confidence = min(gradient_confidence, 1.0)
+                        final_confidence = min(gradient_confidence, 3.0)  # Allow higher confidence for negative differentials
                         waterline_candidates.append((waterline_y, final_confidence))
                         
-                        # Store candidate info in region data for logging
+                        # Store candidate info in region data for logging  
+                        is_topmost_negative = is_first_region and is_negative_differential and not topmost_negative_found
                         if self.debug_enabled and image_path and gradient_analysis_data['regions']:
                             gradient_analysis_data['regions'][-1]['candidates_found'].append({
                                 'y_position': waterline_y,
                                 'confidence': final_confidence,
                                 'local_gradient': local_gradient,
                                 'surrounding_variance': surrounding_variance,
-                                'gradient_diff_value': gradient_diff[i]
+                                'gradient_diff_value': gradient_diff_value,
+                                'is_negative_differential': is_negative_differential,
+                                'is_topmost_negative': is_topmost_negative
                             })
                         
-                        self.logger.debug(f"Valid gradient transition at Y={waterline_y}, confidence: {final_confidence:.3f}")
+                        detection_type = "NEGATIVE DIFF" if is_negative_differential else "GENERAL"
+                        self.logger.debug(f"Valid gradient transition ({detection_type}) at Y={waterline_y}, "
+                                        f"confidence: {final_confidence:.3f}, diff: {gradient_diff_value:.1f}")
         
         # Sort by confidence and remove duplicates
         unique_candidates = list(set(waterline_candidates))
@@ -645,9 +707,12 @@ class HybridWaterlineAnalyzer:
             
             # Add details for each suspicious region
             for i, (y_min, y_max, reason, confidence) in enumerate(suspicious_regions):
+                stadia_min = self._pixel_to_cm(y_min)
+                stadia_max = self._pixel_to_cm(y_max)
                 candidate_info_lines.extend([
                     f"Region {i+1}:",
                     f"  Y-range: {y_min:.1f} - {y_max:.1f}",
+                    f"  Stadia range: {stadia_max:.1f} - {stadia_min:.1f} cm",
                     f"  Reason: {reason.replace('_', ' ')}",
                     f"  Confidence: {confidence:.3f}"
                 ])
@@ -671,6 +736,8 @@ class HybridWaterlineAnalyzer:
             gradient_info_lines = [
                 f"Gradient candidates found: {len(gradient_candidates)}",
                 f"Gradient threshold: {self.gradient_threshold}",
+                f"Negative gradient threshold: {self.negative_gradient_threshold}",
+                f"Pixels per cm: {self.pixels_per_cm:.3f}",
                 f"Kernel size: {self.gradient_kernel_size}",
                 f"Search height: {self.transition_search_height}px",
                 "",
@@ -681,9 +748,14 @@ class HybridWaterlineAnalyzer:
                 ""
             ]
             
-            # Add top gradient candidates
-            for i, (y_pos, confidence) in enumerate(gradient_candidates[:10]):
-                gradient_info_lines.append(f"Candidate {i+1}: Y={y_pos:.1f}, confidence={confidence:.3f}")
+            # Add top gradient candidates with stadia readings
+            if gradient_candidates:
+                gradient_info_lines.append("Top Waterline Candidates:")
+                for i, (y_pos, confidence) in enumerate(gradient_candidates[:10]):
+                    stadia_reading = self._pixel_to_cm(y_pos)
+                    gradient_info_lines.append(f"  {i+1}: Y={y_pos:.1f} ({stadia_reading:.1f} cm), confidence={confidence:.3f}")
+            else:
+                gradient_info_lines.append("No waterline candidates found")
             
             self.debug_viz.save_debug_image(
                 gradient_analysis_image, 'waterline_gradient_analysis',
@@ -704,17 +776,40 @@ class HybridWaterlineAnalyzer:
             )
             
             # Create comprehensive summary info
+            original_y = analysis_result.get('original_waterline_y', 'N/A')
+            improved_y = analysis_result['improved_waterline_y']
+            
             summary_info_lines = [
                 "WATERLINE VERIFICATION SUMMARY",
                 "",
-                f"Original waterline Y: {analysis_result.get('original_waterline_y', 'N/A')}",
-                f"Improved waterline Y: {analysis_result['improved_waterline_y']}",
-                f"Analysis result: {analysis_result['reason']}",
-                f"Confidence: {analysis_result['confidence']:.3f}"
+                f"Pixels per cm: {self.pixels_per_cm:.3f}",
+                ""
             ]
             
+            # Add original waterline info with stadia reading
+            if original_y != 'N/A' and original_y is not None:
+                original_stadia = self._pixel_to_cm(original_y)
+                summary_info_lines.append(f"Original waterline: Y={original_y} ({original_stadia:.1f} cm)")
+            else:
+                summary_info_lines.append("Original waterline: N/A")
+            
+            # Add improved waterline info with stadia reading  
+            if improved_y is not None:
+                improved_stadia = self._pixel_to_cm(improved_y)
+                summary_info_lines.append(f"Improved waterline: Y={improved_y:.1f} ({improved_stadia:.1f} cm)")
+            else:
+                summary_info_lines.append("Improved waterline: N/A")
+                
+            summary_info_lines.extend([
+                "",
+                f"Analysis result: {analysis_result['reason']}",
+                f"Confidence: {analysis_result['confidence']:.3f}"
+            ])
+            
             if 'improvement_delta' in analysis_result:
-                summary_info_lines.append(f"Improvement delta: {analysis_result['improvement_delta']:.1f} pixels")
+                delta_pixels = analysis_result['improvement_delta']
+                delta_cm = delta_pixels / self.pixels_per_cm
+                summary_info_lines.append(f"Improvement delta: {delta_pixels:.1f} pixels ({delta_cm:.2f} cm)")
             
             # Add buffer information to summary
             last_good_y = getattr(self, 'last_good_pattern_y', None)
@@ -990,24 +1085,30 @@ class HybridWaterlineAnalyzer:
                 content_lines.append(f"Image height: {len(overall_profile)} pixels")
                 content_lines.append(f"Gradient kernel size: {self.gradient_kernel_size}")
                 content_lines.append(f"Gradient threshold: {self.gradient_threshold}")
+                content_lines.append(f"Negative gradient threshold: {self.negative_gradient_threshold}")
+                content_lines.append(f"Pixels per cm calibration: {self.pixels_per_cm:.3f}")
+                content_lines.append(f"Scale total height: {self.config.get('scale', {}).get('total_height', 500.0)} cm")
                 content_lines.append("")
                 
                 content_lines.append("GRADIENT DIFFERENCES BY Y POSITION:")
-                content_lines.append("Y_Position\tGradient_Value\tGradient_Difference\tAbove_Threshold")
-                content_lines.append("-" * 70)
+                content_lines.append("Y_Position\tStadia_Reading_cm\tGradient_Value\tGradient_Difference\tAbove_Threshold\tNegative_Diff")
+                content_lines.append("-" * 110)
                 
                 for y_pos in range(len(overall_profile)):
                     gradient_value = overall_profile[y_pos]
+                    stadia_reading_cm = self._pixel_to_cm(y_pos)
                     
                     # Get gradient difference (if available)
                     if y_pos < len(overall_differences):
                         grad_diff = overall_differences[y_pos]
                         above_threshold = "YES" if abs(grad_diff) > self.gradient_threshold else "NO"
+                        is_negative_diff = "YES" if grad_diff < 0 and abs(grad_diff) > self.negative_gradient_threshold else "NO"
                     else:
                         grad_diff = 0.0
                         above_threshold = "N/A"
+                        is_negative_diff = "N/A"
                     
-                    content_lines.append(f"{y_pos:8d}\t{gradient_value:14.3f}\t{grad_diff:17.3f}\t{above_threshold:>13}")
+                    content_lines.append(f"{y_pos:8d}\t{stadia_reading_cm:14.1f}\t{gradient_value:14.3f}\t{grad_diff:17.3f}\t{above_threshold:>13}\t{is_negative_diff:>12}")
                 
                 content_lines.append("")
                 content_lines.append("SUMMARY STATISTICS:")
@@ -1043,33 +1144,41 @@ class HybridWaterlineAnalyzer:
                     content_lines.append(f"  Region height: {len(region_profile)} pixels")
                     content_lines.append("")
                     content_lines.append(f"  Region Gradient Details (Y positions {region['y_start']}-{region['y_end']}):")
-                    content_lines.append("  Y_Pos\tGradient_Value\tGradient_Difference\tAbove_Threshold")
-                    content_lines.append("  " + "-" * 65)
+                    content_lines.append("  Y_Pos\tStadia_Reading_cm\tGradient_Value\tGradient_Difference\tAbove_Threshold\tNegative_Diff")
+                    content_lines.append("  " + "-" * 105)
                     
                     for j in range(len(region_profile)):
                         y_global = region['y_start'] + j
                         gradient_value = region_profile[j]
+                        stadia_reading_cm = self._pixel_to_cm(y_global)
                         
                         if j < len(region_differences):
                             grad_diff = region_differences[j]
                             above_threshold = "YES" if abs(grad_diff) > self.gradient_threshold else "NO"
+                            is_negative_diff = "YES" if grad_diff < 0 and abs(grad_diff) > self.negative_gradient_threshold else "NO"
                         else:
                             grad_diff = 0.0
                             above_threshold = "N/A"
+                            is_negative_diff = "N/A"
                         
-                        content_lines.append(f"  {y_global:5d}\t{gradient_value:14.3f}\t{grad_diff:17.3f}\t{above_threshold:>13}")
+                        content_lines.append(f"  {y_global:5d}\t{stadia_reading_cm:14.1f}\t{gradient_value:14.3f}\t{grad_diff:17.3f}\t{above_threshold:>13}\t{is_negative_diff:>12}")
                 
                 # Add candidate information
                 candidates = region.get('candidates_found', [])
                 if candidates:
                     content_lines.append(f"\n  WATERLINE CANDIDATES FOUND IN THIS REGION:")
                     for j, candidate in enumerate(candidates):
+                        y_position = candidate['y_position']
+                        stadia_reading = self._pixel_to_cm(y_position)
                         content_lines.append(f"    Candidate {j+1}:")
-                        content_lines.append(f"      Y Position: {candidate['y_position']}")
+                        content_lines.append(f"      Y Position: {y_position}")
+                        content_lines.append(f"      Stadia Reading: {stadia_reading:.1f} cm")
                         content_lines.append(f"      Confidence: {candidate['confidence']:.3f}")
                         content_lines.append(f"      Local Gradient: {candidate['local_gradient']:.3f}")
                         content_lines.append(f"      Surrounding Variance: {candidate['surrounding_variance']:.3f}")
                         content_lines.append(f"      Gradient Diff Value: {candidate['gradient_diff_value']:.3f}")
+                        content_lines.append(f"      Is Negative Differential: {candidate.get('is_negative_differential', False)}")
+                        content_lines.append(f"      Is Topmost Negative: {candidate.get('is_topmost_negative', False)}")
                 else:
                     content_lines.append(f"\n  No waterline candidates found in this region.")
             
@@ -1078,10 +1187,11 @@ class HybridWaterlineAnalyzer:
             content_lines.append("FINAL WATERLINE CANDIDATES:")
             content_lines.append("-" * 50)
             if sorted_candidates:
-                content_lines.append("Rank\tY_Position\tConfidence")
-                content_lines.append("-" * 30)
+                content_lines.append("Rank\tY_Position\tStadia_Reading_cm\tConfidence")
+                content_lines.append("-" * 50)
                 for i, (y_pos, confidence) in enumerate(sorted_candidates):
-                    content_lines.append(f"{i+1:4d}\t{y_pos:10d}\t{confidence:10.3f}")
+                    stadia_reading = self._pixel_to_cm(y_pos)
+                    content_lines.append(f"{i+1:4d}\t{y_pos:10d}\t{stadia_reading:14.1f}\t{confidence:10.3f}")
             else:
                 content_lines.append("No valid waterline candidates found.")
             

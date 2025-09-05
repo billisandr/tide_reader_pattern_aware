@@ -415,10 +415,12 @@ detection:
    - Cover area systematically rather than relying on pattern anomalies
    - Each region sized for effective gradient detection
 
-4. **Step D: Y-Axis Gradient Analysis**
+4. **Step D: Enhanced Y-Axis Gradient Analysis with Negative Differential Detection**
    - Use vertical gradients (Y-axis changes) to detect horizontal waterline transitions
    - Apply Sobel operator: `cv2.Sobel(roi, cv2.CV_64F, 0, 1, ksize=kernel_size)`
-   - Focus on row-wise gradient changes that indicate water interface
+   - **Priority Detection**: Look for negative gradient differentials indicating water presence
+   - **Topmost Selection**: Prioritize the topmost negative differential in the first candidate region
+   - Focus on row-wise gradient changes that indicate water interface transition
 
 **Configuration:**
 
@@ -430,6 +432,7 @@ detection:
       min_pattern_confidence: 0.6             # Minimum confidence for accepting results
       gradient_kernel_size: 3                 # Sobel operator kernel size
       gradient_threshold: 30                  # Minimum gradient change threshold
+      negative_gradient_threshold: 25         # Minimum absolute value for negative gradient differentials
       transition_search_height: 20            # Height of each search region
       pattern_analysis:
         min_consecutive_patterns: 3           # Minimum consecutive good patterns needed
@@ -442,7 +445,10 @@ detection:
 - **No Anomaly Dependence**: Doesn't require detecting anomalous patterns to define regions
 - **Systematic Coverage**: Scans complete area below last good pattern methodically  
 - **Correct Gradient Direction**: Uses Y-axis gradients for horizontal waterline detection
+- **Negative Gradient Prioritization**: Specifically targets negative gradient differentials as water indicators
+- **Topmost Detection Strategy**: Prioritizes the first (topmost) negative differential for highest accuracy
 - **Configurable Buffering**: Accounts for partially underwater patterns with user-tunable buffer
+- **Enhanced Confidence Scoring**: Boosts confidence for negative differentials up to 3x base confidence
 
 **Debug Output:**
 - **Location**: Integrated with pattern-aware debug visualizer session directories
