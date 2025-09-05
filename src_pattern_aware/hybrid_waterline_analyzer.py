@@ -75,6 +75,134 @@ class HybridWaterlineAnalyzer:
         
         self.logger.info(f"Hybrid Waterline Analyzer initialized as independent post-processor (pixels_per_cm: {self.pixels_per_cm:.2f})")
     
+    def _save_waterline_legend(self, gradient_debug_dir):
+        """
+        Save legend.txt file explaining colors and annotations used in waterline debug images.
+        """
+        legend_path = gradient_debug_dir / "legend.txt"
+        
+        legend_content = """WATERLINE DETECTION DEBUG VISUALIZATION LEGEND
+================================================================
+
+RELATED DOCUMENTATION:
+----------------------
+This legend covers specialized waterline gradient analysis images only.
+
+For general pattern detection debug images in the main session folder, see:
+→ ../legend.txt (main session legend)
+
+The main legend covers: pattern_original, pattern_scale_region, pattern_water_detection,
+pattern_e_pattern_result, and other general detection visualizations.
+
+WATERLINE ANALYSIS CONTEXT:
+This waterline gradient analysis is part of the hybrid detection system that
+improves upon basic E-pattern detection results through systematic gradient scanning.
+
+================================================================
+
+This legend explains the colors, lines, and annotations used in the waterline 
+detection debug images in this folder.
+
+WATERLINE GRADIENT ANALYSIS DEBUG IMAGES:
+-----------------------------------------
+
+1. waterline_candidate_regions (Candidate Region Detection)
+   Colors and Annotations:
+   - GREEN CIRCLES (E1, E2, E3...): Detected E-pattern positions
+     * Color: (0, 255, 0) - Bright Green
+     * Shows center Y position of each detected E-pattern
+     
+   - YELLOW RECTANGLES (R1, R2, R3...): Candidate search regions  
+     * Color: (0, 255, 255) - Yellow
+     * Semi-transparent overlay (20% opacity)
+     * Shows systematic scan areas below last good pattern
+     
+   - BLUE TEXT: Pattern sequence and constraint information
+     * Shows consecutive good patterns count
+     * Displays underwater buffer calculations
+     * Lists Y constraints and stadia rod ranges
+
+2. waterline_gradient_analysis (Gradient Analysis with Annotations)
+   Left Side - Original Scale Image:
+   - GREEN CIRCLES (E1, E2, E3...): E-pattern locations
+     * Same as above - shows pattern context
+     
+   - YELLOW RECTANGLES (R1, R2, R3...): Search regions
+     * Same as above - shows where gradients were analyzed
+     
+   Right Side - Gradient Magnitude Visualization:
+   - GRAYSCALE INTENSITY: Gradient strength
+     * Bright areas = high gradients (edges/transitions)
+     * Dark areas = low gradients (uniform regions)
+     
+   - PURPLE LINES (G1, G2, G3...): Top gradient candidates
+     * Color: (255, 0, 255) - Purple/Magenta  
+     * Thickness: 2 pixels
+     * Shows Y positions of strongest gradient differentials
+     * G1 = highest confidence, G2 = second highest, etc.
+
+3. waterline_gradient_analysis_clean (Clean Gradient Visualization)
+   - Same as above but without text overlays
+   - Pure gradient magnitude visualization for analysis
+   - YELLOW borders on regions maintained
+   - PURPLE lines for gradient candidates maintained
+
+4. waterline_verification_analysis (Final Results Summary)
+   Colors and Annotations:
+   - GREEN CIRCLES (E1, E2, E3...): E-pattern detections
+     * Color: (0, 255, 0) - Shows pattern baseline
+     
+   - YELLOW RECTANGLES (R1, R2, R3...): Analyzed regions
+     * Color: (0, 255, 255) - Search coverage
+     
+   - RED LINE: Original waterline (if present)
+     * Color: (0, 0, 255) - BGR Red
+     * Thickness: 3 pixels
+     * Shows E-pattern detector's initial result
+     
+   - MAGENTA LINE: Improved waterline (if different)  
+     * Color: (255, 0, 255) - Magenta
+     * Thickness: 3 pixels
+     * Shows hybrid analyzer's improved result
+     
+   - LIGHT PURPLE LINES (G1, G2, G3): Top gradient candidates
+     * Color: (128, 128, 255) - Light Purple
+     * Thickness: 1 pixel
+     * Shows alternative candidates considered
+
+GRADIENT DIFFERENCE ANALYSIS:
+-----------------------------
+
+The gradient analysis detects horizontal waterlines by looking for:
+- NEGATIVE GRADIENT DIFFERENTIALS: Transitions from bright (scale) to dark (water)
+- Y-AXIS GRADIENTS: Vertical intensity changes indicating horizontal features
+- TOPMOST NEGATIVE: First negative differential in primary region (highest priority)
+
+COORDINATE SYSTEM:
+------------------
+- Y=0 is at the top of the image
+- Higher Y values = lower on the stadia rod scale  
+- Pixel positions are converted to stadia rod readings (cm)
+- YELLOW region ranges show both pixel Y and stadia cm values
+
+CONFIDENCE SCORING:
+-------------------
+- Negative differentials: 2.0x base confidence boost
+- Topmost negative differential: Additional 1.5x boost (3.0x total)
+- Region-based weighting: Primary regions get higher confidence
+- Final confidence can exceed 1.0 for high-priority detections
+
+LEGEND CREATED: Generated automatically during waterline analysis
+================================================================
+"""
+        
+        try:
+            with open(legend_path, 'w', encoding='utf-8') as f:
+                f.write(legend_content)
+            self.logger.debug(f"Saved waterline legend to {legend_path}")
+        except Exception as e:
+            self.logger.error(f"Failed to save waterline legend: {e}")
+    
     def _pixel_to_cm(self, pixel_y: float) -> float:
         """
         Convert pixel Y coordinate to stadia rod reading in cm.
@@ -1205,6 +1333,9 @@ class HybridWaterlineAnalyzer:
                 f.write('\n'.join(content_lines))
             
             self.logger.info(f"Saved detailed gradient analysis to: {text_file_path}")
+            
+            # Save legend.txt file in the same directory
+            self._save_waterline_legend(gradient_debug_dir)
             
         except Exception as e:
             self.logger.error(f"Failed to save gradient analysis text file: {e}")

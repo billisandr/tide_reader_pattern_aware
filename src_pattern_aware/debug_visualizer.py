@@ -57,6 +57,146 @@ class DebugVisualizer:
         
         self.current_image_name = Path(image_path).stem
         self.logger.debug(f"Starting debug for image: {self.current_image_name}")
+        
+        # Generate legend.txt for the main session directory
+        if hasattr(self, 'session_dir') and self.session_dir:
+            self._save_main_legend()
+    
+    def _save_main_legend(self):
+        """
+        Save legend.txt file explaining colors and annotations used in main pattern-aware debug images.
+        """
+        if not hasattr(self, 'session_dir') or not self.session_dir:
+            return
+            
+        legend_path = self.session_dir / "legend.txt"
+        
+        # Only create legend once per session
+        if legend_path.exists():
+            return
+            
+        legend_content = """PATTERN-AWARE DEBUG VISUALIZATION LEGEND
+=============================================
+
+This legend explains the colors, lines, and annotations used in the pattern-aware 
+detection debug images in this session directory.
+
+MAIN DEBUG IMAGES:
+------------------
+
+1. pattern_original
+   - Original input image without any modifications
+   - Shows the full image as received by the detector
+   - No annotations - reference image
+
+2. pattern_scale_region  
+   - Extracted scale region for analysis
+   - Cropped area where pattern detection occurs
+   - Shows the calibrated region of interest
+   - No annotations - cropped reference
+
+3. pattern_preprocessing
+   - Scale region prepared for pattern analysis
+   - Same as scale region but indicates start of processing
+   - Used by integrated detector for method comparison
+
+4. pattern_water_detection (Final Result)
+   Colors and Annotations:
+   - WATERLINE - Horizontal line showing detected water level
+     * Color depends on detection method used
+     * Thickness: 2-3 pixels
+     * Spans full width of scale region
+     
+   - SCALE REGION OUTLINE (if shown)
+     * Color: Green (0, 255, 0) 
+     * Thickness: 2 pixels
+     * Shows boundaries of analyzed area
+
+METHOD-SPECIFIC RESULTS:
+------------------------
+
+5. pattern_e_pattern_result
+   Colors and Annotations:
+   - DETECTED WATERLINE: Final E-pattern detection result
+     * Color varies by confidence/method
+     * Shows improved result if hybrid analysis was applied
+     * Text label indicates Y position and method
+
+6. pattern_[method_name]_result (e.g., pattern_template_matching_result)
+   - Individual detection method results before final selection
+   - YELLOW LINE: Method-specific waterline detection
+     * Color: (0, 255, 255) - Yellow
+     * Thickness: 2 pixels
+   - Text overlay shows method name and Y position
+
+7. pattern_methods_summary
+   - Summary when all detection methods fail
+   - Shows why detection failed
+   - May contain diagnostic information
+
+E-PATTERN DETECTION COLORS:
+----------------------------
+
+E-patterns (when visible in debug images):
+- PURPLE RECTANGLES: Detected E-pattern templates
+  * Color: (128, 0, 128) - Purple  
+  * Thickness: 2 pixels
+  * Shows bounding boxes around matched templates
+  
+- GREEN CIRCLES: Template centers (in some visualizations)
+  * Color: (0, 255, 0) - Bright Green
+  * Used in hybrid waterline analysis images
+
+COORDINATE SYSTEM:
+------------------
+- Y=0 is at the top of the scale region
+- Higher Y values = lower on the stadia rod scale
+- All Y positions refer to scale region coordinates
+- Final results are converted to global image coordinates
+
+DETECTION PROCESS:
+------------------
+1. Original image → Scale region extraction
+2. Scale region → Pattern preprocessing  
+3. Pattern detection → Individual method results
+4. Method results → Final waterline selection
+5. Optional: Hybrid analysis for improved accuracy
+
+FILES IN THIS SESSION:
+----------------------
+- Images: PNG/JPG files with visual annotations
+- Text files: Detailed analysis data (if available)
+- Subfolders: Specialized analysis (e.g., waterline_gradient_analysis)
+- legend.txt: This file explaining visualizations
+
+SPECIALIZED ANALYSIS DOCUMENTATION:
+-----------------------------------
+This session may include specialized analysis subfolders with additional debug images:
+
+- waterline_gradient_analysis/: Advanced hybrid waterline detection analysis
+  → See waterline_gradient_analysis/legend.txt for detailed gradient analysis documentation
+  → Includes 4 specialized visualizations with purple/yellow/green color coding
+  → Contains advanced gradient differential theory and candidate selection details
+  → Covers: candidate regions, gradient analysis, verification summaries
+
+For complete understanding of all debug visualizations, check both this legend
+and any subfolder-specific legend.txt files.
+
+OTHER ANALYSIS FOLDERS:
+-----------------------
+Additional specialized analysis folders may be created as needed, each with their
+own legend.txt file explaining the specific visualizations and color coding used.
+
+LEGEND CREATED: Generated automatically during pattern-aware detection
+=============================================
+"""
+        
+        try:
+            with open(legend_path, 'w', encoding='utf-8') as f:
+                f.write(legend_content)
+            self.logger.debug(f"Saved main pattern-aware legend to {legend_path}")
+        except Exception as e:
+            self.logger.error(f"Failed to save main legend: {e}")
     
     def save_debug_image(self, image, step_name, annotations=None, info_text=None):
         """
