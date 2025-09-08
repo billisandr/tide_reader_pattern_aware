@@ -44,9 +44,8 @@ def analyze_e_pattern_waterline(config: Dict[str, Any],
         - improved_waterline_y: Suggested improved waterline Y position
         - confidence: Confidence in the improvement (0.0-1.0)
         - analysis_performed: Whether analysis was actually performed
-        - reason: Reason for the result (improved_detection, confirmed_original, etc.)
+        - reason: Reason for the result (improved_detection, low_confidence, etc.)
         - original_waterline_y: Original waterline for reference
-        - improvement_delta: Difference in pixels (if improved)
     """
     if logger is None:
         logger = logging.getLogger(__name__)
@@ -132,15 +131,11 @@ def apply_hybrid_waterline_improvement(original_waterline_y: Optional[int],
     reason = hybrid_analysis_result['reason']
     
     if reason == 'improved_detection' and confidence >= acceptance_threshold:
-        improvement_delta = hybrid_analysis_result.get('improvement_delta', 0)
-        logger.info(f"Applying hybrid waterline improvement: from Y={original_waterline_y} to Y={improved_y} "
-                   f"(delta={improvement_delta:.1f}px, confidence={confidence:.3f})")
+        logger.info(f"Applying hybrid waterline result: from Y={original_waterline_y} to Y={improved_y} "
+                   f"(confidence={confidence:.3f})")
         return improved_y
-    elif reason == 'confirmed_original':
-        logger.info(f"Hybrid analysis confirms original waterline: Y={original_waterline_y}")
-        return original_waterline_y
     else:
-        logger.debug(f"Hybrid improvement not applied: {reason} (confidence={confidence:.3f})")
+        logger.debug(f"Hybrid result not applied: {reason} (confidence={confidence:.3f})")
         return original_waterline_y
 
 

@@ -188,10 +188,12 @@ COORDINATE SYSTEM:
 
 CONFIDENCE SCORING:
 -------------------
-- Negative differentials: 2.0x base confidence boost
-- Topmost negative differential: Additional 1.5x boost (3.0x total)
-- Region-based weighting: Primary regions get higher confidence
-- Final confidence can exceed 1.0 for high-priority detections
+- Combined metric approach: Blue signature + gradient differentials + edge magnitude
+- Blue signature: Negative raw Sobel gradients (1.5x weight) - primary waterline indicator  
+- Gradient differentials: Negative vertical transitions (1.0x weight) - secondary indicator
+- Edge magnitude: Transition sharpness (0.3x weight) - supporting factor
+- Region-based weighting: Primary regions get higher base confidence
+- No artificial confidence cap - full discrimination based on combined strength
 
 LEGEND CREATED: Generated automatically during waterline analysis
 ================================================================
@@ -698,7 +700,7 @@ LEGEND CREATED: Generated automatically during waterline analysis
                             self.logger.debug(f"Rejected gradient candidate at Y={waterline_y} - above constraint Y={min_allowed_y:.1f}")
                             continue
                         
-                        final_confidence = min(gradient_confidence, 3.0)  # Allow higher confidence for negative differentials
+                        final_confidence = gradient_confidence  # Use full combined metric confidence without cap
                         waterline_candidates.append((waterline_y, final_confidence))
                         
                         # Store candidate info in region data for logging
@@ -782,30 +784,18 @@ LEGEND CREATED: Generated automatically during waterline analysis
         
         # Check if confidence meets threshold
         if best_confidence >= self.min_confidence_threshold:
-            # Use improved waterline if significantly different or original failed
-            if original_waterline_y is None or abs(best_y - original_waterline_y) > 10:
-                self.logger.info(f"Hybrid analysis suggests improved waterline: Y={best_y} "
-                               f"(original: {original_waterline_y}, confidence: {best_confidence:.3f})")
-                return {
-                    'improved_waterline_y': best_y,
-                    'confidence': best_confidence,
-                    'analysis_performed': True,
-                    'reason': 'improved_detection',
-                    'original_waterline_y': original_waterline_y,
-                    'improvement_delta': abs(best_y - original_waterline_y) if original_waterline_y else 0,
-                    'suspicious_regions': suspicious_regions,
-                    'gradient_candidates': gradient_candidates
-                }
-            else:
-                self.logger.info(f"Hybrid analysis confirms original waterline: Y={original_waterline_y}")
-                return {
-                    'improved_waterline_y': original_waterline_y,
-                    'confidence': best_confidence,
-                    'analysis_performed': True,
-                    'reason': 'confirmed_original',
-                    'suspicious_regions': suspicious_regions,
-                    'gradient_candidates': gradient_candidates
-                }
+            # Use hybrid waterline based on confidence alone
+            self.logger.info(f"Hybrid analysis provides waterline: Y={best_y} "
+                           f"(original: {original_waterline_y}, confidence: {best_confidence:.3f})")
+            return {
+                'improved_waterline_y': best_y,
+                'confidence': best_confidence,
+                'analysis_performed': True,
+                'reason': 'improved_detection',
+                'original_waterline_y': original_waterline_y,
+                'suspicious_regions': suspicious_regions,
+                'gradient_candidates': gradient_candidates
+            }
         else:
             self.logger.warning(f"Best candidate confidence too low: {best_confidence:.3f} < {self.min_confidence_threshold}")
             return {
@@ -966,10 +956,13 @@ LEGEND CREATED: Generated automatically during waterline analysis
                 f"Confidence: {analysis_result['confidence']:.3f}"
             ])
             
-            if 'improvement_delta' in analysis_result:
-                delta_pixels = analysis_result['improvement_delta']
+            # Add comparison info if original waterline exists
+            original_y = analysis_result.get('original_waterline_y')
+            improved_y = analysis_result.get('improved_waterline_y')
+            if original_y is not None and improved_y is not None and original_y != improved_y:
+                delta_pixels = abs(improved_y - original_y)
                 delta_cm = delta_pixels / self.pixels_per_cm
-                summary_info_lines.append(f"Improvement delta: {delta_pixels:.1f} pixels ({delta_cm:.2f} cm)")
+                summary_info_lines.append(f"Position change: {delta_pixels:.1f} pixels ({delta_cm:.2f} cm)")
             
             # Add buffer information to summary
             last_good_y = getattr(self, 'last_good_pattern_y', None)

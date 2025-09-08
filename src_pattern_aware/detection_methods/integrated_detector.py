@@ -118,12 +118,12 @@ class IntegratedPatternDetector:
                                 logger=self.logger
                             )
                             
-                            # Update confidence based on hybrid analysis
+                            # Use hybrid confidence directly when analysis was successful
                             if hybrid_analysis_result.get('analysis_performed', False):
                                 if hybrid_analysis_result['reason'] == 'improved_detection':
-                                    final_confidence = min(0.95, 0.9 + hybrid_analysis_result.get('confidence', 0) * 0.1)
-                                elif hybrid_analysis_result['reason'] == 'confirmed_original':
-                                    final_confidence = min(0.95, 0.9 + 0.05)  # Slight boost for confirmation
+                                    # Use hybrid confidence directly - it represents combined metric quality
+                                    final_confidence = hybrid_analysis_result.get('confidence', 0.9)
+                                    self.logger.info(f"Using hybrid confidence directly: {final_confidence:.3f}")
                             
                         except Exception as e:
                             self.logger.warning(f"Hybrid waterline verification failed: {e}")

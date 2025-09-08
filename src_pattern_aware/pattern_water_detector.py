@@ -259,8 +259,11 @@ class PatternWaterDetector:
                         image = cv2.imread(str(image_path))
                     if image is not None:
                         self.save_processed_image_enhanced(image, None, processing_time, image_path)
-                except:
-                    pass  # Don't let annotated image saving break the main flow
+                    else:
+                        self.logger.warning(f"Could not load image for failed detection annotation: {image_path}")
+                except Exception as save_error:
+                    self.logger.warning(f"Failed to save annotated image for failed detection: {save_error}")
+                    # Don't let annotated image saving break the main flow
             
             if self.fallback_enabled:
                 return self._fallback_to_standard_detection(image, image_path)
@@ -379,14 +382,16 @@ class PatternWaterDetector:
         annotated_dir = Path('data/output/annotated')
         annotated_dir.mkdir(parents=True, exist_ok=True)
         
-        # Include success/failure status in filename
-        output_path = annotated_dir / f"annotated_pattern_{status}_{datetime.now().strftime('%Y%m%d_%H%M%S')}{image_format}"
+        # Include original image name and success/failure status in filename
+        original_name = Path(image_path).stem
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        output_path = annotated_dir / f"{original_name}_annotated_pattern_{status}_{timestamp}{image_format}"
         success = cv2.imwrite(str(output_path), final_image)
         
         if success:
-            self.logger.debug(f"Saved pattern-aware annotated image: {output_path}")
+            self.logger.info(f"Saved pattern-aware annotated image: {output_path}")
         else:
-            self.logger.warning(f"Failed to save pattern-aware annotated image: {output_path}")
+            self.logger.error(f"Failed to save pattern-aware annotated image: {output_path}")
     
     def _add_side_panel_to_output(self, image, title, info_lines):
         """Add side panel to output image using the same format as debug visualizer."""
