@@ -462,9 +462,49 @@ detection:
 - **Gradient Visualization**: Y-axis gradient magnitude with detected transitions
 - **Buffer Information**: Displays buffer calculations and constraint enforcement
 
-**Integration**: Automatically applied when E-pattern detection is used and at least 2 patterns are detected. Falls back to original E-pattern results if hybrid analysis fails.
+**Candidate Density-Based Clustering (NEW - WORKING):**
 
-**Status:** FULLY IMPLEMENTED AND WORKING - Systematic scanning approach successful
+**Purpose:** Improve candidate selection by identifying regions with high candidate density rather than relying solely on individual confidence scores.
+
+**Key Innovation:** Multiple waterline detection methods often produce several candidates near the true waterline. Instead of simply selecting the highest confidence candidate, clustering analysis finds regions with the highest density of candidates and selects the most representative candidate from that cluster.
+
+**Clustering Process:**
+
+1. **Confidence-Based Cluster Centers**: Use top N confidence candidates (default: 10) as potential cluster centers
+2. **Density Analysis**: For each cluster center, count candidates within configurable height region (default: 5.0cm)  
+3. **Best Cluster Selection**: Select cluster center with maximum candidate density
+4. **Candidate Selection**: Within best cluster, choose either:
+   - **Highest confidence candidate** (`use_median_selection: false`)
+   - **Median position candidate** (`use_median_selection: true`) with cluster average confidence
+
+**Configuration:**
+
+```yaml
+detection:
+  pattern_aware:
+    waterline_verification:
+      candidate_clustering:
+        enabled: true                     # Enable density-based candidate selection
+        cluster_height_cm: 5.0            # Height of clustering region in cm
+        min_candidates_in_cluster: 2      # Minimum candidates required to form a cluster
+        use_median_selection: false       # Use median instead of highest confidence within cluster
+        max_cluster_centers: 10           # Maximum number of top candidates to evaluate as cluster centers
+```
+
+**Benefits:**
+- **Robust to outliers**: Reduces impact of single high-confidence noise candidates
+- **Spatial intelligence**: Considers physical proximity of candidates in cm
+- **Efficient computation**: Only evaluates top confidence candidates as cluster centers
+- **Configurable approach**: Adjustable cluster size and selection method
+
+**Debug Output:** Clustering analysis is included in waterline gradient analysis text files, showing:
+- Cluster centers evaluated and their densities
+- Selected cluster information and candidates within cluster
+- Comparison between original confidence ranking and clustering result
+
+**Integration**: Automatically applied after gradient analysis when candidate clustering is enabled. Falls back to original confidence ranking if no suitable clusters are found.
+
+**Status:** FULLY IMPLEMENTED AND WORKING - Confidence-based clustering approach successful
 
 ### Morphological Detection (WORKING)
 

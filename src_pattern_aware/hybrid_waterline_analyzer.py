@@ -730,11 +730,149 @@ LEGEND CREATED: Generated automatically during waterline analysis
         if min_allowed_y is not None and sorted_candidates:
             self.logger.info(f"Found {len(sorted_candidates)} valid waterline candidates below first anomaly")
         
-        # Save detailed gradient analysis to text file
+        # Apply density-based clustering if enabled
+        clustering_config = self.config.get('detection', {}).get('pattern_aware', {}).get('waterline_verification', {}).get('candidate_clustering', {})
+        clustering_result = None
+        if clustering_config.get('enabled', True):
+            self.logger.info(f"Applying confidence-based candidate clustering to {len(sorted_candidates)} candidates")
+            original_candidates = sorted_candidates.copy()
+            sorted_candidates = self._apply_candidate_clustering(sorted_candidates, clustering_config)
+            # Store clustering result for text file output
+            if hasattr(self, '_last_clustering_result'):
+                clustering_result = self._last_clustering_result
+        
+        # Save detailed gradient analysis to text file (after clustering)
         if self.debug_enabled and image_path and self.debug_viz:
-            self._save_gradient_analysis_text_file(gradient_analysis_data, sorted_candidates)
+            self._save_gradient_analysis_text_file(gradient_analysis_data, sorted_candidates, clustering_result)
         
         return sorted_candidates
+    
+    def _apply_candidate_clustering(self, candidates, clustering_config):
+        """
+        Apply density-based clustering to improve candidate selection.
+        Find the region with highest candidate density and return median of that cluster.
+        
+        Args:
+            candidates: List of (y_position, confidence) tuples, sorted by confidence
+            clustering_config: Configuration for clustering parameters
+            
+        Returns:
+            List of candidates, potentially re-ranked by clustering analysis
+        """
+        if len(candidates) < 2:
+            return candidates
+            
+        cluster_height_cm = clustering_config.get('cluster_height_cm', 5.0)
+        min_candidates = clustering_config.get('min_candidates_in_cluster', 2)
+        use_median = clustering_config.get('use_median_selection', True)
+        
+        # Convert cluster height from cm to pixels
+        cluster_height_px = cluster_height_cm * self.pixels_per_cm
+        
+        self.logger.debug(f"Analyzing candidate clustering: {len(candidates)} candidates, "
+                         f"cluster height = {cluster_height_cm}cm ({cluster_height_px:.1f}px)")
+        
+        # Find the region with maximum candidate density using confidence-based cluster centers
+        best_cluster = None
+        best_density = 0
+        
+        # Use top candidates as potential cluster centers (more efficient and biased toward quality)
+        max_cluster_centers = min(clustering_config.get('max_cluster_centers', 10), len(candidates))
+        top_candidates = candidates[:max_cluster_centers]  # Already sorted by confidence
+        
+        self.logger.debug(f"Evaluating {max_cluster_centers} confidence-based cluster centers")
+        
+        for i, (center_y, center_confidence) in enumerate(top_candidates):
+            cluster_min = center_y - cluster_height_px / 2
+            cluster_max = center_y + cluster_height_px / 2
+            
+            # Find all candidates within this cluster
+            cluster_candidates = []
+            for y_pos, confidence in candidates:
+                if cluster_min <= y_pos <= cluster_max:
+                    cluster_candidates.append((y_pos, confidence))
+            
+            # Check if this cluster has sufficient density and is better than previous best
+            cluster_density = len(cluster_candidates)
+            self.logger.debug(f"  Center #{i+1}: Y={center_y:.1f} (conf={center_confidence:.3f}) -> {cluster_density} candidates in cluster")
+            
+            if cluster_density >= min_candidates and cluster_density > best_density:
+                best_density = cluster_density
+                best_cluster = {
+                    'center_y': center_y,
+                    'center_confidence': center_confidence,
+                    'cluster_min': cluster_min,
+                    'cluster_max': cluster_max,
+                    'candidates': cluster_candidates,
+                    'density': best_density
+                }
+                self.logger.debug(f"    -> New best cluster (density={best_density})")
+        
+        # Store clustering result for reporting
+        clustering_result = {
+            'total_candidates': len(candidates),
+            'cluster_height_cm': cluster_height_cm,
+            'cluster_height_px': cluster_height_px,
+            'max_cluster_centers': max_cluster_centers,
+            'clustering_approach': 'confidence_based_centers',
+            'best_cluster': best_cluster,
+            'clustering_applied': False,
+            'selection_method': 'original_ranking'
+        }
+        
+        # If we found a good cluster, apply cluster-based selection
+        if best_cluster is not None:
+            cluster_candidates = best_cluster['candidates']
+            cluster_center = best_cluster['center_y']
+            
+            self.logger.info(f"Found density cluster: {best_density} candidates in {cluster_height_cm}cm region "
+                           f"around Y={cluster_center:.1f} (stadia: {self._pixel_to_cm(cluster_center):.1f}cm)")
+            
+            clustering_result['clustering_applied'] = True
+            clustering_result['cluster_center_y'] = cluster_center
+            clustering_result['cluster_center_cm'] = self._pixel_to_cm(cluster_center)
+            clustering_result['cluster_size'] = best_density
+            
+            if use_median and len(cluster_candidates) >= 3:
+                # Sort cluster candidates by position and take median
+                sorted_by_position = sorted(cluster_candidates, key=lambda x: x[0])
+                median_idx = len(sorted_by_position) // 2
+                median_candidate = sorted_by_position[median_idx]
+                
+                # Calculate cluster confidence (average of cluster candidates)
+                cluster_confidence = sum(c[1] for c in cluster_candidates) / len(cluster_candidates)
+                
+                self.logger.info(f"Selected median candidate from cluster: Y={median_candidate[0]:.1f} "
+                               f"(original confidence: {median_candidate[1]:.3f}, cluster avg: {cluster_confidence:.3f})")
+                
+                clustering_result['selection_method'] = 'median'
+                clustering_result['selected_candidate'] = median_candidate
+                clustering_result['cluster_confidence'] = cluster_confidence
+                clustering_result['cluster_candidates'] = cluster_candidates
+                
+                # Return median candidate with enhanced confidence, followed by original ranking
+                enhanced_median = (median_candidate[0], cluster_confidence)
+                remaining_candidates = [c for c in candidates if c != median_candidate]
+                self._last_clustering_result = clustering_result
+                return [enhanced_median] + remaining_candidates
+            else:
+                # Take highest confidence candidate from cluster
+                cluster_best = max(cluster_candidates, key=lambda x: x[1])
+                self.logger.info(f"Selected best candidate from cluster: Y={cluster_best[0]:.1f} "
+                               f"(confidence: {cluster_best[1]:.3f})")
+                
+                clustering_result['selection_method'] = 'best_in_cluster'
+                clustering_result['selected_candidate'] = cluster_best
+                clustering_result['cluster_candidates'] = cluster_candidates
+                
+                # Move cluster best to front, keep original ranking for others
+                remaining_candidates = [c for c in candidates if c != cluster_best]
+                self._last_clustering_result = clustering_result
+                return [cluster_best] + remaining_candidates
+        else:
+            self.logger.debug("No significant candidate clusters found, using original confidence ranking")
+            self._last_clustering_result = clustering_result
+            return candidates
     
     def _select_best_waterline(self, 
                              suspicious_regions: List[Tuple[int, int, str, float]],
@@ -1186,7 +1324,7 @@ LEGEND CREATED: Generated automatically during waterline analysis
         
         return summary_image
     
-    def _save_gradient_analysis_text_file(self, gradient_analysis_data: Dict[str, Any], sorted_candidates: List[Tuple[int, float]]):
+    def _save_gradient_analysis_text_file(self, gradient_analysis_data: Dict[str, Any], sorted_candidates: List[Tuple[int, float]], clustering_result: Optional[Dict[str, Any]] = None):
         """
         Save detailed gradient analysis data to a text file in the waterline_gradient_analysis directory.
         """
@@ -1336,6 +1474,46 @@ LEGEND CREATED: Generated automatically during waterline analysis
                         content_lines.append(f"      Is Negative Differential: {candidate.get('is_negative_differential', False)}")
                 else:
                     content_lines.append(f"\n  No waterline candidates found in this region.")
+            
+            # Candidate clustering analysis
+            if clustering_result is not None:
+                content_lines.append("")
+                content_lines.append("CANDIDATE CLUSTERING ANALYSIS:")
+                content_lines.append("-" * 50)
+                content_lines.append(f"Total candidates analyzed: {clustering_result['total_candidates']}")
+                content_lines.append(f"Clustering approach: {clustering_result['clustering_approach'].replace('_', ' ').title()}")
+                content_lines.append(f"Cluster centers evaluated: {clustering_result['max_cluster_centers']} (top confidence candidates)")
+                content_lines.append(f"Clustering region height: {clustering_result['cluster_height_cm']:.1f} cm ({clustering_result['cluster_height_px']:.1f} px)")
+                content_lines.append(f"Clustering applied: {'YES' if clustering_result['clustering_applied'] else 'NO'}")
+                content_lines.append(f"Selection method: {clustering_result['selection_method'].replace('_', ' ').title()}")
+                
+                if clustering_result['clustering_applied']:
+                    content_lines.append("")
+                    content_lines.append("DENSITY CLUSTER FOUND:")
+                    content_lines.append(f"  Cluster center: Y={clustering_result['cluster_center_y']:.1f} ({clustering_result['cluster_center_cm']:.1f} cm)")
+                    content_lines.append(f"  Cluster size: {clustering_result['cluster_size']} candidates")
+                    
+                    if 'cluster_candidates' in clustering_result:
+                        content_lines.append("")
+                        content_lines.append("  Candidates in cluster:")
+                        content_lines.append("  Rank\tY_Position\tStadia_Reading_cm\tOriginal_Confidence")
+                        content_lines.append("  " + "-" * 60)
+                        cluster_candidates = clustering_result['cluster_candidates']
+                        sorted_cluster = sorted(cluster_candidates, key=lambda x: x[1], reverse=True)
+                        for i, (y_pos, confidence) in enumerate(sorted_cluster):
+                            stadia_reading = self._pixel_to_cm(y_pos)
+                            content_lines.append(f"  {i+1:4d}\t{y_pos:10d}\t{stadia_reading:14.1f}\t{confidence:16.3f}")
+                    
+                    if 'selected_candidate' in clustering_result:
+                        sel_y, sel_conf = clustering_result['selected_candidate']
+                        sel_stadia = self._pixel_to_cm(sel_y)
+                        content_lines.append("")
+                        content_lines.append(f"  Selected from cluster: Y={sel_y:.1f} ({sel_stadia:.1f} cm)")
+                        if 'cluster_confidence' in clustering_result:
+                            content_lines.append(f"  Cluster average confidence: {clustering_result['cluster_confidence']:.3f}")
+                else:
+                    content_lines.append("  No significant density clusters found")
+                    content_lines.append("  Using original confidence-based ranking")
             
             # Final candidates summary
             content_lines.append("")

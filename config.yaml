@@ -181,6 +181,14 @@ detection:
         # Baseline buffer configuration - percentage of average pattern height for symmetric region around baseline
         # This creates equal coverage above and below the last detected pattern
         baseline_buffer_percentage: 0.6   # Buffer as % of avg pattern height (symmetric coverage)
+      
+      # Candidate density-based clustering for improved selection
+      candidate_clustering:
+        enabled: true                     # Enable density-based candidate selection
+        cluster_height_cm: 5.0            # Height of clustering region in cm (default 5cm)
+        min_candidates_in_cluster: 2      # Minimum candidates required to form a cluster
+        use_median_selection: false       # Use median instead of highest confidence within cluster
+        max_cluster_centers: 10           # Maximum number of top candidates to evaluate as cluster centers
 
 processing:
   # Image processing settings
