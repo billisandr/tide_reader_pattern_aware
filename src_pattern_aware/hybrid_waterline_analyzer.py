@@ -49,7 +49,8 @@ class HybridWaterlineAnalyzer:
         self.gradient_kernel_size = verification_config.get('gradient_kernel_size', 3)
         self.gradient_threshold = verification_config.get('gradient_threshold', 30)
         self.negative_gradient_threshold = verification_config.get('negative_gradient_threshold', 25)
-        self.transition_search_height = verification_config.get('transition_search_height', 20)
+        self.negative_sobel_threshold = verification_config.get('negative_sobel_threshold', 50)
+        self.enable_fallback_regions = verification_config.get('enable_fallback_regions', True)
         
         # Pattern analysis thresholds (consolidated configuration)
         pattern_config = verification_config.get('pattern_analysis', {})
@@ -66,9 +67,9 @@ class HybridWaterlineAnalyzer:
         self.aspect_ratio_anomaly_threshold = pattern_config.get('aspect_ratio_anomaly_threshold', 0.20)
         self.max_gap_ratio = pattern_config.get('max_gap_ratio', 2.0)
         
-        # Underwater buffer configuration - percentage of average pattern height to search above last_good_y
-        # This accounts for cases where last_good_y might be underwater
-        self.underwater_buffer_percentage = pattern_config.get('underwater_buffer_percentage', 0.3)
+        # Baseline buffer configuration - percentage of average pattern height for symmetric region around baseline
+        # This creates symmetric coverage above and below the last detected pattern
+        self.baseline_buffer_percentage = pattern_config.get('baseline_buffer_percentage', 0.3)
         
         # Use debug visualizer's session directory if available
         self.debug_enabled = config.get('debug', {}).get('enabled', True) and debug_viz is not None
@@ -386,31 +387,31 @@ LEGEND CREATED: Generated automatically during waterline analysis
                                          lowest_pattern.get('template_size', (20, 15)) else 15)
         lowest_pattern_bottom_y = lowest_center_y + (lowest_height // 2)  # Bottom of lowest pattern
         
-        # Calculate buffer for region around baseline
-        baseline_buffer = average_pattern_height * self.underwater_buffer_percentage
-        region_height = self.transition_search_height * 2  # Make regions larger for better gradient detection
+        # Calculate symmetric buffer around baseline
+        baseline_buffer = average_pattern_height * self.baseline_buffer_percentage
         
         self.logger.info(f"Using LOWEST pattern at center Y={lowest_center_y}, bottom Y={lowest_pattern_bottom_y}")
-        self.logger.info(f"Creating candidate regions AROUND baseline with {baseline_buffer:.1f}px buffer")
+        self.logger.info(f"Creating symmetric candidate region around baseline with {baseline_buffer:.1f}px buffer")
         
-        # MOST IMPORTANT: Create primary candidate region AROUND the baseline
-        # This covers the most probable waterline location: around the last detected pattern
-        primary_region_start = lowest_pattern_bottom_y - baseline_buffer  # Start ABOVE bottom of pattern
-        primary_region_end = lowest_pattern_bottom_y + baseline_buffer + region_height  # Extend well below
+        # SYMMETRIC: Create primary candidate region AROUND the baseline with equal heights above/below
+        primary_region_start = lowest_pattern_bottom_y - baseline_buffer  # Equal distance above baseline
+        primary_region_end = lowest_pattern_bottom_y + baseline_buffer    # Equal distance below baseline
         candidate_regions.append((primary_region_start, primary_region_end, "around_baseline", 1.0))
         
         # Create additional candidate regions extending further downward for completeness
-        current_scan_y = primary_region_end
-        region_count = 1
-        max_additional_regions = 2  # Fewer regions since primary region covers most probable area
-        
-        while region_count <= max_additional_regions:
-            next_region_y_min = current_scan_y
-            next_region_y_max = next_region_y_min + region_height
-            candidate_regions.append((next_region_y_min, next_region_y_max, f"extended_scan_{region_count}", 0.6))
+        if self.enable_fallback_regions:
+            current_scan_y = primary_region_end
+            region_count = 1
+            max_additional_regions = 2  # Fewer regions since primary region covers most probable area
+            fallback_region_height = baseline_buffer  # Use same buffer size for consistent coverage
             
-            current_scan_y = next_region_y_max
-            region_count += 1
+            while region_count <= max_additional_regions:
+                next_region_y_min = current_scan_y
+                next_region_y_max = next_region_y_min + fallback_region_height
+                candidate_regions.append((next_region_y_min, next_region_y_max, f"extended_scan_{region_count}", 0.6))
+                
+                current_scan_y = next_region_y_max
+                region_count += 1
         
         # Store analysis results for waterline enforcement and debug info
         self.first_anomaly_y = primary_region_start  # Primary candidate region start
@@ -420,7 +421,13 @@ LEGEND CREATED: Generated automatically during waterline analysis
         
         self.logger.info(f"Created {len(candidate_regions)} waterline candidate regions")
         self.logger.info(f"Primary region (around baseline): Y={primary_region_start:.1f} to Y={primary_region_end:.1f}")
-        self.logger.info(f"All regions cover Y={primary_region_start:.1f} to Y={current_scan_y:.1f}")
+        
+        # Calculate total coverage based on actual regions created
+        if len(candidate_regions) > 1:
+            last_region_end = max(region[1] for region in candidate_regions)
+            self.logger.info(f"All regions cover Y={primary_region_start:.1f} to Y={last_region_end:.1f}")
+        else:
+            self.logger.info(f"Single region covers Y={primary_region_start:.1f} to Y={primary_region_end:.1f}")
         
         return candidate_regions
     
@@ -520,6 +527,29 @@ LEGEND CREATED: Generated automatically during waterline analysis
         merged.append(current)
         return merged
     
+    def _calculate_waterline_strength(self, raw_gradient_value, gradient_diff_value, local_gradient):
+        """
+        Calculate combined waterline detection strength score.
+        Combines blue signature (negative raw Sobel), gradient differences, and edge magnitude.
+        """
+        strength_score = 1.0
+        
+        # Factor 1: Blue signature strength (negative raw Sobel gradients indicate water)
+        if raw_gradient_value < 0:
+            blue_strength = abs(raw_gradient_value) / self.negative_sobel_threshold
+            strength_score += blue_strength * 1.5  # Primary waterline indicator
+        
+        # Factor 2: Negative differential strength (traditional gradient diff approach)  
+        if gradient_diff_value < 0:
+            diff_strength = abs(gradient_diff_value) / self.negative_gradient_threshold
+            strength_score += diff_strength * 1.0  # Secondary indicator
+        
+        # Factor 3: Edge magnitude strength (transition sharpness)
+        edge_strength = local_gradient / self.negative_sobel_threshold
+        strength_score += edge_strength * 0.3  # Supporting factor
+        
+        return strength_score
+    
     def _analyze_gradient_transitions(self, 
                                     scale_region: np.ndarray, 
                                     candidate_regions: List[Tuple[int, int, str, float]],
@@ -566,13 +596,13 @@ LEGEND CREATED: Generated automatically during waterline analysis
         average_pattern_height = getattr(self, 'average_pattern_height', 20.0)
         
         # Calculate buffer: configurable percentage of average pattern height for edge cases
-        underwater_buffer = average_pattern_height * self.underwater_buffer_percentage
+        baseline_buffer = average_pattern_height * self.baseline_buffer_percentage
         
         # Since regions are now properly defined below last_good_y, use a more conservative constraint
         if last_good_y is not None:
-            # Allow small buffer for measurement precision, but regions should already be below last_good_y
-            min_allowed_y = last_good_y - (underwater_buffer * 0.5)  # Reduced buffer since regions are corrected
-            constraint_desc = f"last good pattern Y={last_good_y} with reduced buffer (-{underwater_buffer * 0.5:.1f}px)"
+            # Allow small buffer for measurement precision, with symmetric baseline regions
+            min_allowed_y = last_good_y - (baseline_buffer * 0.5)  # Reduced buffer since regions are symmetric
+            constraint_desc = f"last good pattern Y={last_good_y} with reduced buffer (-{baseline_buffer * 0.5:.1f}px)"
         else:
             min_allowed_y = first_anomaly_y
             constraint_desc = f"first anomaly Y={first_anomaly_y}"
@@ -609,6 +639,9 @@ LEGEND CREATED: Generated automatically during waterline analysis
             # Get gradient profile (average per row) - this shows Y-axis transitions
             gradient_profile = np.mean(grad_magnitude, axis=1)
             
+            # ENHANCED: Also get raw signed gradient profile for blue signature detection
+            raw_gradient_profile = np.mean(grad_y, axis=1)
+            
             # Store region gradient data for logging
             region_data = {
                 'y_start': y_start,
@@ -638,26 +671,22 @@ LEGEND CREATED: Generated automatically during waterline analysis
                     is_negative_differential = gradient_diff_value < 0 and abs(gradient_diff_value) > self.negative_gradient_threshold
                     
                     if is_significant_change:
-                        # Calculate confidence
+                        # Calculate confidence using COMBINED METRIC approach
                         local_gradient = gradient_profile[i] if i < len(gradient_profile) else 0
                         surrounding_variance = np.var(gradient_profile[max(0, i-3):min(len(gradient_profile), i+4)])
                         
+                        # Get raw Sobel gradient value for blue signature detection
+                        raw_gradient_value = raw_gradient_profile[i] if i < len(raw_gradient_profile) else 0
+                        
                         # Base confidence on gradient strength and local variance
-                        gradient_confidence = min(local_gradient / 100.0, 1.0) * min(surrounding_variance / 50.0, 1.0)
+                        base_confidence = min(local_gradient / 100.0, 1.0) * min(surrounding_variance / 50.0, 1.0)
                         
-                        # IMPROVED: Give highest priority to negative gradient differentials in first region
-                        if is_first_region and is_negative_differential:
-                            gradient_confidence *= 2.0  # Significantly boost confidence for negative differentials
-                            
-                            # If this is the topmost negative differential in first region, give it max priority
-                            if not topmost_negative_found:
-                                gradient_confidence *= 1.5  # Additional boost for topmost negative
-                                topmost_negative_found = True
-                                self.logger.info(f"Found topmost negative gradient differential at Y={y_start + i} "
-                                               f"(diff: {gradient_diff_value:.1f}, threshold: {self.negative_gradient_threshold})")
+                        # ENHANCED: Combined waterline strength metric (replaces hierarchical approach)
+                        waterline_strength = self._calculate_waterline_strength(raw_gradient_value, gradient_diff_value, local_gradient)
+                        gradient_confidence = base_confidence * waterline_strength
                         
-                        # Apply region-based confidence scaling for non-negative differentials
-                        elif "around_baseline" in reason:
+                        # Apply region-based confidence scaling
+                        if "around_baseline" in reason:
                             gradient_confidence *= 1.2  # Higher confidence for first region below patterns
                         elif "extended_scan" in reason:
                             gradient_confidence *= 0.9  # Slightly lower confidence for extended regions
@@ -672,8 +701,7 @@ LEGEND CREATED: Generated automatically during waterline analysis
                         final_confidence = min(gradient_confidence, 3.0)  # Allow higher confidence for negative differentials
                         waterline_candidates.append((waterline_y, final_confidence))
                         
-                        # Store candidate info in region data for logging  
-                        is_topmost_negative = is_first_region and is_negative_differential and not topmost_negative_found
+                        # Store candidate info in region data for logging
                         if self.debug_enabled and image_path and gradient_analysis_data['regions']:
                             gradient_analysis_data['regions'][-1]['candidates_found'].append({
                                 'y_position': waterline_y,
@@ -681,13 +709,17 @@ LEGEND CREATED: Generated automatically during waterline analysis
                                 'local_gradient': local_gradient,
                                 'surrounding_variance': surrounding_variance,
                                 'gradient_diff_value': gradient_diff_value,
-                                'is_negative_differential': is_negative_differential,
-                                'is_topmost_negative': is_topmost_negative
+                                'raw_gradient_value': raw_gradient_value,
+                                'waterline_strength': waterline_strength,
+                                'is_negative_differential': is_negative_differential
                             })
                         
-                        detection_type = "NEGATIVE DIFF" if is_negative_differential else "GENERAL"
+                        # Enhanced detection logging with combined metrics
+                        blue_signature = "BLUE" if raw_gradient_value < 0 else "NO_BLUE"
+                        detection_type = f"{blue_signature}+NEGATIVE_DIFF" if is_negative_differential else f"{blue_signature}+GENERAL"
                         self.logger.debug(f"Valid gradient transition ({detection_type}) at Y={waterline_y}, "
-                                        f"confidence: {final_confidence:.3f}, diff: {gradient_diff_value:.1f}")
+                                        f"confidence: {final_confidence:.3f}, diff: {gradient_diff_value:.1f}, "
+                                        f"raw Sobel: {raw_gradient_value:.1f}, strength: {waterline_strength:.2f}")
         
         # Sort by confidence and remove duplicates
         unique_candidates = list(set(waterline_candidates))
@@ -728,10 +760,10 @@ LEGEND CREATED: Generated automatically during waterline analysis
         last_good_y = getattr(self, 'last_good_pattern_y', None)
         first_anomaly_y = getattr(self, 'first_anomaly_y', None)
         average_pattern_height = getattr(self, 'average_pattern_height', 20.0)
-        underwater_buffer = average_pattern_height * self.underwater_buffer_percentage
+        baseline_buffer = average_pattern_height * self.baseline_buffer_percentage
         
         if last_good_y is not None:
-            min_allowed_y = last_good_y - (underwater_buffer * 0.5)  # Same reduced buffer as gradient analysis
+            min_allowed_y = last_good_y - (baseline_buffer * 0.5)  # Same reduced buffer as gradient analysis
             constraint_desc = f"buffered last good pattern Y={min_allowed_y:.1f} (original: {last_good_y}, reduced buffer)"
         else:
             min_allowed_y = first_anomaly_y
@@ -810,7 +842,7 @@ LEGEND CREATED: Generated automatically during waterline analysis
                 f"  Size anomaly threshold: {self.size_anomaly_threshold}",
                 f"  Aspect ratio anomaly threshold: {self.aspect_ratio_anomaly_threshold}",
                 f"  Max gap ratio: {self.max_gap_ratio}",
-                f"  Underwater buffer: {self.underwater_buffer_percentage:.1%}",
+                f"  Underwater buffer: {self.baseline_buffer_percentage:.1%}",
                 ""
             ]
             
@@ -820,8 +852,8 @@ LEGEND CREATED: Generated automatically during waterline analysis
             average_pattern_height = getattr(self, 'average_pattern_height', 20.0)
             
             if consecutive_patterns > 0:
-                underwater_buffer = average_pattern_height * self.underwater_buffer_percentage
-                buffered_constraint = last_good_y - underwater_buffer if last_good_y else None
+                baseline_buffer = average_pattern_height * self.baseline_buffer_percentage
+                buffered_constraint = last_good_y - baseline_buffer if last_good_y else None
                 
                 candidate_info_lines.extend([
                     "",
@@ -829,7 +861,7 @@ LEGEND CREATED: Generated automatically during waterline analysis
                     f"  Consecutive good patterns: {consecutive_patterns}",
                     f"  Last good pattern Y: {last_good_y}",
                     f"  Average pattern height: {average_pattern_height:.1f}px",
-                    f"  Underwater buffer: {underwater_buffer:.1f}px ({self.underwater_buffer_percentage:.1%})",
+                    f"  Underwater buffer: {baseline_buffer:.1f}px ({self.baseline_buffer_percentage:.1%})",
                     f"  Buffered constraint Y: {buffered_constraint:.1f}" if buffered_constraint else "  No buffered constraint"
                 ])
             
@@ -858,20 +890,20 @@ LEGEND CREATED: Generated automatically during waterline analysis
             # Create detailed gradient info
             last_good_y = getattr(self, 'last_good_pattern_y', None)
             average_pattern_height = getattr(self, 'average_pattern_height', 20.0)
-            underwater_buffer = average_pattern_height * self.underwater_buffer_percentage
-            buffered_constraint = last_good_y - underwater_buffer if last_good_y else None
+            baseline_buffer = average_pattern_height * self.baseline_buffer_percentage
+            buffered_constraint = last_good_y - baseline_buffer if last_good_y else None
             
             gradient_info_lines = [
                 f"Gradient candidates found: {len(gradient_candidates)}",
                 f"Gradient threshold: {self.gradient_threshold}",
                 f"Negative gradient threshold: {self.negative_gradient_threshold}",
+                f"Negative Sobel threshold: {self.negative_sobel_threshold}",
                 f"Pixels per cm: {self.pixels_per_cm:.3f}",
                 f"Kernel size: {self.gradient_kernel_size}",
-                f"Search height: {self.transition_search_height}px",
                 "",
                 "Waterline Constraints:",
                 f"  Last good pattern Y: {last_good_y}" if last_good_y else "  No last good pattern",
-                f"  Underwater buffer: {underwater_buffer:.1f}px ({self.underwater_buffer_percentage:.1%})" if last_good_y else "",
+                f"  Underwater buffer: {baseline_buffer:.1f}px ({self.baseline_buffer_percentage:.1%})" if last_good_y else "",
                 f"  Min allowed Y: {buffered_constraint:.1f}" if buffered_constraint else "  No Y constraint",
                 ""
             ]
@@ -942,7 +974,7 @@ LEGEND CREATED: Generated automatically during waterline analysis
             # Add buffer information to summary
             last_good_y = getattr(self, 'last_good_pattern_y', None)
             average_pattern_height = getattr(self, 'average_pattern_height', 20.0)
-            underwater_buffer = average_pattern_height * self.underwater_buffer_percentage if last_good_y else 0
+            baseline_buffer = average_pattern_height * self.baseline_buffer_percentage if last_good_y else 0
             
             summary_info_lines.extend([
                 "",
@@ -952,8 +984,8 @@ LEGEND CREATED: Generated automatically during waterline analysis
                 f"  Gradient candidates: {len(gradient_candidates)}",
                 "",
                 "Buffer Configuration:",
-                f"  Underwater buffer: {self.underwater_buffer_percentage:.1%} of pattern height",
-                f"  Buffer size: {underwater_buffer:.1f}px" if underwater_buffer > 0 else "  No buffer applied"
+                f"  Underwater buffer: {self.baseline_buffer_percentage:.1%} of pattern height",
+                f"  Buffer size: {baseline_buffer:.1f}px" if baseline_buffer > 0 else "  No buffer applied"
             ])
             
             self.debug_viz.save_debug_image(
@@ -1214,6 +1246,7 @@ LEGEND CREATED: Generated automatically during waterline analysis
                 content_lines.append(f"Gradient kernel size: {self.gradient_kernel_size}")
                 content_lines.append(f"Gradient threshold: {self.gradient_threshold}")
                 content_lines.append(f"Negative gradient threshold: {self.negative_gradient_threshold}")
+                content_lines.append(f"Negative Sobel threshold: {self.negative_sobel_threshold}")
                 content_lines.append(f"Pixels per cm calibration: {self.pixels_per_cm:.3f}")
                 content_lines.append(f"Scale total height: {self.config.get('scale', {}).get('total_height', 500.0)} cm")
                 content_lines.append("")
@@ -1305,8 +1338,9 @@ LEGEND CREATED: Generated automatically during waterline analysis
                         content_lines.append(f"      Local Gradient: {candidate['local_gradient']:.3f}")
                         content_lines.append(f"      Surrounding Variance: {candidate['surrounding_variance']:.3f}")
                         content_lines.append(f"      Gradient Diff Value: {candidate['gradient_diff_value']:.3f}")
+                        content_lines.append(f"      Raw Gradient Value: {candidate.get('raw_gradient_value', 'N/A'):.3f}")
+                        content_lines.append(f"      Waterline Strength: {candidate.get('waterline_strength', 'N/A'):.3f}")
                         content_lines.append(f"      Is Negative Differential: {candidate.get('is_negative_differential', False)}")
-                        content_lines.append(f"      Is Topmost Negative: {candidate.get('is_topmost_negative', False)}")
                 else:
                     content_lines.append(f"\n  No waterline candidates found in this region.")
             

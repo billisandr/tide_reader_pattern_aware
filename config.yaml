@@ -157,11 +157,12 @@ detection:
     # Hybrid waterline verification system
     waterline_verification:
       enabled: true                   # Enable hybrid waterline verification
+      enable_fallback_regions: false   # Enable extended regions below primary region (set to false for primary region only)
       min_pattern_confidence: 0.7     # Minimum confidence for waterline detection
       gradient_kernel_size: 3         # Sobel kernel size for gradient analysis
       gradient_threshold: 25          # Threshold for significant gradient changes
       negative_gradient_threshold: 25 # Minimum absolute value for negative gradient differentials (waterline detection)
-      transition_search_height: 20    # Search height around suspicious regions (pixels)
+      negative_sobel_threshold: 40    # Threshold for negative raw Sobel gradients (blue signature detection)
       
       # Pattern analysis thresholds (used for both consecutive pattern detection and anomaly detection)
       pattern_analysis:
@@ -177,9 +178,9 @@ detection:
         aspect_ratio_anomaly_threshold: 0.20 # Aspect ratio change to flag suspicious regions (±20%)
         max_gap_ratio: 0.5                   # Max gap between patterns (2x expected spacing)
         
-        # Underwater buffer configuration - percentage of average pattern height to search above last_good_y
-        # This accounts for cases where last_good_y might be underwater
-        underwater_buffer_percentage: 0.6   # Buffer as % of avg pattern height (30% = 0.3)
+        # Baseline buffer configuration - percentage of average pattern height for symmetric region around baseline
+        # This creates equal coverage above and below the last detected pattern
+        baseline_buffer_percentage: 0.6   # Buffer as % of avg pattern height (symmetric coverage)
 
 processing:
   # Image processing settings

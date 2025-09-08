@@ -415,11 +415,13 @@ detection:
    - Cover area systematically rather than relying on pattern anomalies
    - Each region sized for effective gradient detection
 
-4. **Step D: Enhanced Y-Axis Gradient Analysis with Negative Differential Detection**
+4. **Step D: Enhanced Y-Axis Gradient Analysis with Combined Metric Detection**
    - Use vertical gradients (Y-axis changes) to detect horizontal waterline transitions
    - Apply Sobel operator: `cv2.Sobel(roi, cv2.CV_64F, 0, 1, ksize=kernel_size)`
-   - **Priority Detection**: Look for negative gradient differentials indicating water presence
-   - **Topmost Selection**: Prioritize the topmost negative differential in the first candidate region
+   - **Combined Metric Approach**: Integrate multiple waterline indicators:
+     - **Blue Signature**: Raw negative Sobel gradients indicating water darkness
+     - **Gradient Differentials**: Traditional negative gradient differences 
+     - **Edge Magnitude**: Transition sharpness for supporting evidence
    - Focus on row-wise gradient changes that indicate water interface transition
 
 **Configuration:**
@@ -433,10 +435,11 @@ detection:
       gradient_kernel_size: 3                 # Sobel operator kernel size
       gradient_threshold: 30                  # Minimum gradient change threshold
       negative_gradient_threshold: 25         # Minimum absolute value for negative gradient differentials
-      transition_search_height: 20            # Height of each search region
+      negative_sobel_threshold: 50            # Threshold for negative raw Sobel gradients (blue signature detection)
+      enable_fallback_regions: true           # Enable extended regions below primary region
       pattern_analysis:
         min_consecutive_patterns: 3           # Minimum consecutive good patterns needed
-        underwater_buffer_percentage: 0.3    # Buffer above last_good_y (30% of pattern height)
+        baseline_buffer_percentage: 0.3      # Symmetric buffer around baseline (30% of pattern height)
 ```
 
 **Key Improvements Over Previous Approach:**
@@ -445,10 +448,13 @@ detection:
 - **No Anomaly Dependence**: Doesn't require detecting anomalous patterns to define regions
 - **Systematic Coverage**: Scans complete area below last good pattern methodically  
 - **Correct Gradient Direction**: Uses Y-axis gradients for horizontal waterline detection
-- **Negative Gradient Prioritization**: Specifically targets negative gradient differentials as water indicators
-- **Topmost Detection Strategy**: Prioritizes the first (topmost) negative differential for highest accuracy
+- **Combined Metric Detection**: Integrates multiple waterline signatures for robust detection:
+  - Raw Sobel gradients for blue signature detection
+  - Gradient differentials for traditional transition detection
+  - Edge magnitude for transition sharpness assessment
 - **Configurable Buffering**: Accounts for partially underwater patterns with user-tunable buffer
-- **Enhanced Confidence Scoring**: Boosts confidence for negative differentials up to 3x base confidence
+- **Region Control**: Optional fallback regions for extended coverage when needed
+- **Enhanced Confidence Scoring**: Proportional scoring based on multiple waterline indicators
 
 **Debug Output:**
 - **Location**: Integrated with pattern-aware debug visualizer session directories
