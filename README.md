@@ -13,7 +13,6 @@
 - [Overview](#overview)
 - [Features](#features)
 - [Quick Use Guide](#quick-use-guide)
-- [Quick Start](#quick-start)
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Usage](#usage)
@@ -39,21 +38,10 @@
 
 This system provides automated water/tide level detection and measurement using computer vision techniques. Designed for fixed camera setups with calibrated measurement scales, it processes images continuously and stores precise measurements in a database.
 
-**🔴 Key Applications:**
-
-- Tide monitoring stations
-- River water level monitoring
-- Laboratory water measurement
 
 ## Features
 
-- **Automated Processing**: Continuous monitoring of input directories
-- **Tool for Visual Calibration**: One-time setup for fixed camera-scale configurations  
-- **Multiple Detection Methods**: Edge detection, color-based analysis, and gradient methods
-- **GUI Interface**: Optional tkinter interface for input directory selection
-- **Database Export Options**: CSV, JSON, and database export capabilities
-- **Visual Debugging & Detailed Logging Option**: Step-by-step storage of annotated images for manual verification
-- **Reporting**: Automated measurement reports and visualizations
+Automated processing with visual calibration, multiple detection methods, GUI interface, database exports, and comprehensive debugging capabilities.
 
 ## Quick Use Guide
 
@@ -270,50 +258,6 @@ processing:
 
 > **Note:** This guide covers the essential workflow from setup to measurement results. For detailed configuration options, see the full documentation sections below.
 
-## Quick Start
-
-### Using Docker (Recommended)
-
-1. **Clone and setup:**
-
-```bash
-git clone <your-repo-url>
-cd tide-level-img-proc
-```
-
-2. **Configure environment:**
-
-```bash
-cp .env.example .env
-# Edit .env with your settings
-```
-
-3. **Deploy:**
-
-```bash
-docker compose up --build -d
-```
-
-### Local Development
-
-1. **Install dependencies:**
-
-```bash
-pip install -r requirements.txt
-```
-
-2. **Run calibration:**
-
-```bash
-# Place calibration image in data/calibration/
-set CALIBRATION_MODE=true & python src/main.py
-```
-
-3. **Start processing:**
-
-```bash
-python src/main.py
-```
 
 ## Installation
 
@@ -453,29 +397,6 @@ detection:
   water_hsv_lower: [100, 50, 50]   # Lower HSV bounds for water color detection
   water_hsv_upper: [130, 255, 255] # Upper HSV bounds for water color detection
   
-  # Pattern-aware detection configuration (used with pattern_processing.mode: 'pattern_aware')
-  pattern_aware:
-    # Hybrid waterline verification system
-    waterline_verification:
-      enabled: true                   # Enable hybrid waterline verification
-      min_pattern_confidence: 0.7     # Minimum confidence for waterline detection
-      gradient_kernel_size: 3         # Sobel kernel size for gradient analysis
-      gradient_threshold: 10          # Threshold for significant gradient changes
-      transition_search_height: 20    # Search height around suspicious regions (pixels)
-      
-      # Consolidated pattern analysis thresholds
-      pattern_analysis:
-        # Consecutive good pattern detection thresholds
-        scale_consistency_threshold: 0.15    # Scale factor consistency for consecutive good patterns (±15%)
-        size_consistency_threshold: 0.25     # Size consistency for consecutive good patterns (±25%) 
-        spacing_consistency_threshold: 0.50  # Spacing consistency for consecutive good patterns (±50%)
-        min_consecutive_patterns: 3          # Minimum consecutive good patterns required
-        
-        # Anomaly detection thresholds (applied after establishing baseline)
-        scale_anomaly_threshold: 0.15        # Scale factor change to flag suspicious regions (±15%)
-        size_anomaly_threshold: 0.20         # Size change to flag suspicious regions (±20%)
-        aspect_ratio_anomaly_threshold: 0.20 # Aspect ratio change to flag suspicious regions (±20%)
-        max_gap_ratio: 2.0                   # Max gap between patterns (2x expected spacing)
 
 processing:
   # Image processing settings
@@ -546,15 +467,7 @@ debug:
 python src/calibration/analyze_scale_photo.py
 ```
 
-**The interactive analysis tool provides:**
-
-- **Enhanced waterline detection**: Mark actual waterline position on scale for precise calibration
-- **Real measurement inputs**: Enter actual scale readings for accurate cm/pixel calculation
-- **Interactive scale boundary picker**: Click on full visible scale corners (even if partially underwater)
-- **Interactive color selection**: Click on scale background and marking colors (optional)
-- **Interactive water color sampling**: Click on water color for detection parameter calibration (optional)
-- **Color analysis**: Analyzes selected scale and water colors for RGB/HSV detection setup
-- **Configuration suggestions**: Generates optimal config.yaml values with custom color ranges
+The interactive analysis tool allows you to mark the waterline position, enter actual scale readings, select scale boundaries, and optionally configure colors for detection.
 
 **Interactive Analysis Workflow:**
 
@@ -604,15 +517,7 @@ set CALIBRATION_MODE=true & python src/main.py
 # → Ready for highly accurate water level detection
 ```
 
-**Enhanced Advantages**:
-
-- **Highest accuracy**: Uses actual scale measurements instead of estimates
-- **Waterline-aware**: Directly incorporates current water level into calibration
-- **Handles submersion**: Works perfectly with partially underwater scales
-- **Real measurements**: No guessing - uses actual scale readings for calibration
-- **Complete setup**: Handles configuration, calibration, AND waterline detection
-- **Color calibration**: Includes water color detection setup
-- **User control**: Full control over scale boundaries and measurement points
+This method uses actual scale measurements for highest accuracy and incorporates the current waterline position into calibration.
 
 #### Workflow 2: Direct Configuration Calibration (Legacy)
 
@@ -648,15 +553,7 @@ set CALIBRATION_MODE=true & python src/main.py
 3. **Consistent Format**: Same data structure regardless of generation method
 4. **Automatic Updates**: Each calibration run updates the file with current settings
 
-**Recent Improvements (Latest Version)**:
-
-- **Fixed YAML serialization errors**: Resolved numpy object serialization issues in calibration.yaml
-- **Improved image display timing**: Calibration image now shows before measurement input
-- **Enhanced waterline gradient analysis**: Fixed KeyError issues with gradient data structure
-- **Clean output messages**: Removed Unicode tick marks that caused display issues
-- **Windows command syntax**: Updated all command examples to use proper Windows syntax (`set VAR=value & command`)
-- **Better error handling**: Improved numpy type conversion for YAML compatibility
-- **Enhanced summary display**: Clear config.yaml suggestions shown at end of calibration process
+**Recent Improvements**: Fixed YAML serialization, improved image display timing, enhanced waterline gradient analysis, and better error handling.
 
 **Enhanced generated calibration.yaml contains**:
 
@@ -871,13 +768,7 @@ detection:
   method: 'gradient'  # Options: 'edge', 'color', 'gradient' (recommended for clear water)
 ```
 
-**Enhanced Detection Features (Latest Version):**
-
-- **Multi-Color-Space Analysis**: Analyzes water effects across RGB, HSV, LAB, and YUV color spaces
-- **Clear Water Optimization**: Specifically designed for clear water that darkens scale background
-- **Edge-Gradient Fusion**: Combines Sobel, Scharr, and Laplacian edge detection with gradient analysis
-- **Texture Variance Analysis**: Detects water's smoothing effect on surface texture
-- **Enhanced Calibration Integration**: Uses waterline reference data from interactive calibration
+**Enhanced Detection Features**: Multi-color-space analysis, clear water optimization, edge-gradient fusion, and enhanced calibration integration.
 
 **Method Selection Guide:**
 
@@ -995,163 +886,6 @@ scale_colors:
 
 The color detection can be **enabled/disabled per color** and includes **extensive debug visualization** showing mask generation, edge enhancement, and contour analysis.
 
-### Pattern Continuity Analysis Configuration
-
-**⚠️ NEW FEATURE**: Advanced pattern continuity analysis for E-pattern sequential detection with configurable thresholds.
-
-The pattern-aware detection system includes sophisticated **pattern continuity analysis** that ensures gradient analysis only runs after establishing a baseline of consecutive good patterns. This prevents false waterline detection from early pattern inconsistencies.
-
-#### How Pattern Continuity Analysis Works
-
-The system follows this logical sequence:
-
-1. **Consecutive Good Pattern Detection**: Analyzes E-patterns from top to bottom to find patterns with consistent scale factors, sizes, and spacing
-2. **Baseline Establishment**: Uses only the consecutive good patterns to calculate reliable baseline metrics  
-3. **Anomaly Detection**: Only analyzes patterns that come **after** the established good sequence
-4. **Gradient Analysis**: Performs water interface gradient analysis **only** in suspicious regions after good patterns
-
-#### Consolidated Pattern Analysis Configuration
-
-```yaml
-detection:
-  pattern_aware:
-    waterline_verification:
-      pattern_analysis:
-        # Consecutive good pattern detection thresholds
-        scale_consistency_threshold: 0.15    # Scale factor consistency (±15%)
-        size_consistency_threshold: 0.25     # Template size consistency (±25%) 
-        spacing_consistency_threshold: 0.50  # Pattern spacing consistency (±50%)
-        min_consecutive_patterns: 3          # Minimum consecutive patterns required
-        
-        # Anomaly detection thresholds (applied after establishing baseline)
-        scale_anomaly_threshold: 0.15        # Scale factor change to flag suspicious regions (±15%)
-        size_anomaly_threshold: 0.20         # Size change to flag suspicious regions (±20%)
-        aspect_ratio_anomaly_threshold: 0.20 # Aspect ratio change to flag suspicious regions (±20%)
-        max_gap_ratio: 2.0                   # Max gap between patterns (2x expected spacing)
-```
-
-#### Parameter Details
-
-**🎯 `scale_consistency_threshold` (Default: 0.15)**
-- **Purpose**: Controls scale factor consistency for consecutive good patterns
-- **Range**: 0.05 (very strict) to 0.30 (very lenient)
-- **Effect**: Lower values = stricter consecutive pattern requirements
-- **Example**: 0.15 means patterns with scale factors within ±15% of the first pattern are considered "good"
-- **Use Case**: 
-  - **Decrease to 0.10**: For very uniform scales with consistent pattern sizes
-  - **Increase to 0.20**: For scales with natural size variations or lighting changes
-
-**📏 `size_consistency_threshold` (Default: 0.25)**  
-- **Purpose**: Controls template size consistency for consecutive good patterns
-- **Range**: 0.10 (very strict) to 0.40 (very lenient)
-- **Effect**: Lower values = stricter size consistency requirements
-- **Example**: 0.25 means patterns with sizes within ±25% of the first pattern are considered "good"
-- **Use Case**:
-  - **Decrease to 0.15**: For scales with very uniform pattern sizes
-  - **Increase to 0.35**: For scales with perspective distortion or variable pattern sizes
-
-**📐 `spacing_consistency_threshold` (Default: 0.50)**
-- **Purpose**: Controls pattern spacing consistency for consecutive good patterns  
-- **Range**: 0.20 (very strict) to 0.80 (very lenient)
-- **Effect**: Lower values = stricter spacing consistency requirements
-- **Example**: 0.50 means pattern spacing within ±50% of average spacing is considered "good"
-- **Use Case**:
-  - **Decrease to 0.30**: For scales with very uniform pattern spacing
-  - **Increase to 0.70**: For scales with variable spacing or perspective effects
-
-**🔢 `min_consecutive_patterns` (Default: 3)**
-- **Purpose**: Minimum number of consecutive good patterns required before analyzing anomalies
-- **Range**: 2 to 6 patterns
-- **Effect**: Higher values = more reliable baseline but requires more visible patterns
-- **Example**: 3 means the system needs at least 3 consecutive good patterns to establish baseline
-- **Use Case**:
-  - **Decrease to 2**: For images with fewer visible patterns or partially submerged scales
-  - **Increase to 4-5**: For very high accuracy requirements with many visible patterns
-
-#### Configuration Examples
-
-**🔧 High Precision Setup** (Strict thresholds for laboratory conditions):
-```yaml
-pattern_analysis:
-  # Consecutive pattern detection (strict)
-  scale_consistency_threshold: 0.10    # Very strict scale consistency
-  size_consistency_threshold: 0.15     # Very strict size consistency  
-  spacing_consistency_threshold: 0.30  # Very strict spacing consistency
-  min_consecutive_patterns: 4          # Require 4 good patterns
-  
-  # Anomaly detection (strict)
-  scale_anomaly_threshold: 0.10        # Very strict scale anomaly detection
-  size_anomaly_threshold: 0.15         # Very strict size anomaly detection
-  aspect_ratio_anomaly_threshold: 0.15 # Very strict aspect anomaly detection
-  max_gap_ratio: 1.5                   # Stricter gap detection
-```
-
-**🌊 Field Conditions Setup** (Lenient thresholds for outdoor/variable conditions):
-```yaml
-pattern_analysis:
-  # Consecutive pattern detection (lenient)
-  scale_consistency_threshold: 0.20    # More lenient scale consistency
-  size_consistency_threshold: 0.30     # More lenient size consistency
-  spacing_consistency_threshold: 0.60  # More lenient spacing consistency  
-  min_consecutive_patterns: 2          # Require only 2 good patterns
-  
-  # Anomaly detection (lenient)
-  scale_anomaly_threshold: 0.20        # More lenient scale anomaly detection
-  size_anomaly_threshold: 0.25         # More lenient size anomaly detection
-  aspect_ratio_anomaly_threshold: 0.25 # More lenient aspect anomaly detection
-  max_gap_ratio: 3.0                   # More lenient gap detection
-```
-
-**🔬 Research Setup** (Balanced thresholds for scientific applications):
-```yaml
-pattern_analysis:
-  # Consecutive pattern detection (balanced)
-  scale_consistency_threshold: 0.12    # Moderately strict scale consistency
-  size_consistency_threshold: 0.20     # Moderately strict size consistency
-  spacing_consistency_threshold: 0.40  # Moderately strict spacing consistency
-  min_consecutive_patterns: 3          # Standard requirement
-  
-  # Anomaly detection (balanced)
-  scale_anomaly_threshold: 0.15        # Balanced scale anomaly detection
-  size_anomaly_threshold: 0.20         # Balanced size anomaly detection
-  aspect_ratio_anomaly_threshold: 0.20 # Balanced aspect anomaly detection
-  max_gap_ratio: 2.0                   # Standard gap detection
-```
-
-#### Troubleshooting Pattern Continuity
-
-**Problem**: "Only X consecutive good patterns found - insufficient for reliable waterline analysis"
-
-**Solutions**:
-- **Increase threshold values** to be more lenient with pattern variations
-- **Decrease `min_consecutive_patterns`** if fewer patterns are visible
-- **Check E-pattern templates** to ensure they match your scale markings
-- **Verify scale detection** is properly identifying the scale region
-
-**Problem**: Gradient analysis running too early (before actual water interface)
-
-**Solutions**:
-- **Decrease threshold values** to be stricter with pattern consistency
-- **Increase `min_consecutive_patterns`** to require more baseline patterns
-- **Check debug images** to see where consecutive patterns break
-
-**Problem**: System too strict, not detecting any waterline
-
-**Solutions**:
-- **Increase all threshold values** by 0.05-0.10 increments
-- **Decrease `min_consecutive_patterns`** to 2
-- **Enable debug mode** to see pattern continuity analysis results
-
-#### Debug Information
-
-When debug mode is enabled, the pattern continuity analysis provides:
-
-- **Console logging** showing where pattern sequences break
-- **Debug panel information** showing consecutive pattern count and baseline position  
-- **Visual annotations** distinguishing good patterns from anomalous patterns
-- **Threshold comparison details** for each pattern analyzed
-
-This advanced pattern continuity system ensures that waterline detection is physically consistent and only occurs after establishing reliable pattern baselines.
 
 ## Data Export Options
 
@@ -1172,7 +906,7 @@ output:
 
 - Creates `measurements_YYYYMMDD_HHMMSS.csv` files
 - Includes all measurement data in tabular format
-- **New**: `detection_method` column shows which method was actually used (e.g., 'e_pattern_sequential', 'enhanced_gradient', 'standard', etc.)
+- `detection_method` column shows which method was actually used (e.g., 'enhanced_gradient', 'edge', 'color', 'gradient')
 - Compatible with Excel, data analysis tools
 - Best for: Spreadsheet analysis, reporting, graphs, method performance tracking
 
@@ -1192,11 +926,7 @@ output:
 
 ### Export Behavior
 
-- **Automatic**: Exports occur after each batch of images is processed
-- **Timestamped**: Files include date/time to prevent overwrites
-- **Conditional**: Only enabled formats create files
-- **Error Handling**: Export failures don't stop image processing
-- **Directory Creation**: Output directories are created automatically
+Exports occur automatically after processing with timestamped filenames, conditional format creation, and error handling.
 
 **Example Output:**
 
@@ -1221,25 +951,34 @@ output:
 ## Project Structure
 
 ```
-tide-level-img-proc/
-├── src/                        # Source code
-│   ├── main.py                 # Main application entry point
-│   ├── water_level_detector.py # Core processing logic
-│   ├── calibration.py          # Calibration management
-│   ├── database.py            # Database operations
-│   └── utils.py               # Utility functions
-├── data/                      # Data directories
-│   ├── input/                 # Input images
-│   ├── processed/            # Processed images  
-│   ├── calibration/          # Calibration data
-│   └── output/               # Export files
-├── logs/                     # Application logs
-├── config.yaml              # System configuration
-├── requirements.txt         # Python dependencies
-├── Dockerfile              # Container configuration
-├── docker-compose.yml      # Deployment configuration
-├── .env.example           # Environment template
-└── README.md             # Documentation
+tide-level-img-proc-backup/
+├── src/                            # Source code
+│   ├── calibration/               # Calibration tools
+│   │   ├── analyze_scale_photo.py # Interactive scale analysis tool
+│   │   └── quick_scale_analysis.py # Quick scale analysis utility
+│   ├── main.py                    # Main application entry point
+│   ├── water_level_detector.py    # Core processing logic
+│   ├── calibration.py             # Calibration management
+│   ├── database.py               # Database operations
+│   ├── debug_visualizer.py       # Debug image generation
+│   └── utils.py                  # Utility functions
+├── data/                         # Data directories
+│   ├── input/                    # Input images
+│   ├── processed/               # Processed images  
+│   ├── calibration/             # Calibration data
+│   ├── output/                  # Export files and databases
+│   └── debug/                   # Debug images (when enabled)
+├── docs/                        # Additional documentation
+├── logs/                        # Application logs
+├── config.yaml                 # System configuration
+├── requirements.txt            # Python dependencies
+├── Dockerfile                  # Container configuration
+├── docker-compose.yml         # Deployment configuration
+├── .env.example               # Environment template
+├── LICENSE.md                 # License file
+├── cleanup.bat                # Windows cleanup script
+├── cleanup.ps1               # PowerShell cleanup script
+└── README.md                 # Main documentation
 ```
 
 ## Development
@@ -1295,14 +1034,6 @@ set CALIBRATION_MODE=true & python src/main.py
 set DEBUG_MODE=true & python src/main.py
 ```
 
-### Code Style
-
-The project follows standard Python conventions:
-
-- PEP 8 style guidelines
-- Comprehensive logging throughout
-- Type hints where applicable
-- Docstrings for all functions
 
 ## Troubleshooting
 
@@ -1366,7 +1097,7 @@ The project follows standard Python conventions:
 - Check that `.env` file is being loaded
 - Verify display environment (especially in Docker)
 
-**Docker container won't start:**
+**🔴 Docker container won't start:**
 
 - Check SSL certificate files exist
 - Verify environment variables are set
@@ -1395,12 +1126,7 @@ tail -f logs/water_level.log
 
 ### Visual Debug Analysis
 
-When troubleshooting detection issues, use visual debugging to:
-
-- **Verify scale detection**: Check if blue rectangles properly highlight the measurement scale
-- **Examine edge detection**: Review edge images to ensure proper feature extraction
-- **Validate line detection**: Confirm yellow lines indicate detected water surfaces
-- **Check final measurements**: Review annotated results with overlaid measurements
+When troubleshooting detection issues, use visual debugging to verify scale detection, examine edge detection, validate line detection, and check final measurements.
 
 ## Deployment Options
 
@@ -1439,35 +1165,6 @@ docker compose -f docker-compose.yml up -d
 docker run -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix your-image
 ```
 
-## Contributing
-
-We welcome contributions! Here's how to get started:
-
-1. **Fork the repository**
-2. **Create a feature branch:** `git checkout -b feature/amazing-feature`
-3. **Make your changes** following the existing code style
-4. **Add tests** for new functionality
-5. **Update documentation** as needed
-6. **Commit changes:** `git commit -m 'Add amazing feature'`
-7. **Push to branch:** `git push origin feature/amazing-feature`
-8. **Open a Pull Request**
-
-### Development Guidelines
-
-- Follow existing code patterns and style
-- Add comprehensive logging for new features
-- Update configuration documentation
-- Test on both local and Docker environments
-- Validate measurement accuracy with known test cases
-
-## Performance
-
-**Typical Performance Metrics:**
-
-- **Processing Speed**: ~2-3 seconds per image
-- **Accuracy**: ±0.5cm with proper calibration
-- **Memory Usage**: ~200MB baseline + image processing overhead
-- **Storage**: ~1MB per 1000 measurements
 
 ## Architecture
 
@@ -1488,24 +1185,9 @@ We welcome contributions! Here's how to get started:
 
 This project is licensed under the BSD 3-Clause License. See [LICENSE](LICENSE) file for details.
 
-## 🔴 Acknowledgments
 
-This work has used ideas from several open-source projects:
-
-- [**Object-Size-measurement-in-an-image-using-OpenCV4.0-and-imutils**](https://github.com/prateekralhan/Object-Size-measurement-in-an-image-using-openCV4.0-and-imutils) - MIT License
-- [**Object-Size-Measurement-Using-OpenCV**](https://github.com/khan-tahir/Object-Size-Measurement-Using-OpenCV) - MIT License
-- [**object-size-detector-python**](https://github.com/intel-iot-devkit/object-size-detector-python) - BSD 3-Clause License  
-- [**Object-Detection-Size-Measurement**](https://github.com/Ali619/Object-Detection-Size-Measurement) - Unspecified license
 
 **Research Context:**
 This work is part of prototype research conducted at the [SenseLAB](http://senselab.tuc.gr/) of the [Technical University of Crete](https://www.tuc.gr/en/).
 
-## Support
 
-- **Issues**: Report bugs and request features via GitHub Issues
-- **Documentation**: Additional documentation in `/docs` directory
-- **Research**: Contact SenseLAB for research collaboration
-
----
-
-*For more detailed technical documentation, see the complete system documentation in the `/docs` directory.*
