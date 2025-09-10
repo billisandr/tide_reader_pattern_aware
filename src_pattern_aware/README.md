@@ -219,7 +219,7 @@ INFO - Hybrid processing: IMG_0154.JPG
 INFO - Running standard detection...
 INFO - Standard detection: 301.3cm (confidence: 0.886)
 INFO - Running pattern-aware detection...
-INFO - Pattern-aware detection: 445.5cm (confidence: 0.950)
+INFO - Pattern-aware detection: 44.55cm (confidence: 0.950)
 INFO - Selected pattern-aware result (higher confidence)
 ```
 
@@ -878,7 +878,7 @@ INFO - Initialized 2 pattern detection methods
 DEBUG - Template matching found 0 marking instances
 DEBUG - Morphological detection found waterline at Y=245
 DEBUG - Selected candidate Y=245 from 2 candidates
-INFO - Pattern detection successful: 445.5cm
+INFO - Pattern detection successful: 44.55cm
 ```
 
 **Expected debug output for hybrid mode:**
@@ -890,10 +890,10 @@ INFO - Hybrid processing: IMG_0154.JPG
 INFO - Running standard detection...
 INFO - Standard detection: 301.3cm (confidence: 0.886)
 INFO - Running pattern-aware detection...
-INFO - Pattern-aware detection: 445.5cm (confidence: 0.950)
+INFO - Pattern-aware detection: 44.55cm (confidence: 0.950)
 INFO - Result comparison:
 INFO -   Standard: 301.3cm (confidence: 0.886)
-INFO -   Pattern:  445.5cm (confidence: 0.950)
+INFO -   Pattern:  44.55cm (confidence: 0.950)
 INFO -   Difference: 144.2cm
 WARNING - Large discrepancy between detection methods (144.2cm)
 INFO - Selected pattern-aware result (higher confidence despite discrepancy)
@@ -910,7 +910,7 @@ INFO - Morphological detector initialized (h_kernel: [40, 1], v_kernel: [1, 40])
 DEBUG - Template matching found 0 marking instances
 DEBUG - Using template-free detection fallback
 DEBUG - Morphological detection found waterline at Y=245
-INFO - Pattern detection successful: 445.5cm
+INFO - Pattern detection successful: 44.55cm
 ```
 
 **Fallback to standard detection:**
@@ -928,7 +928,7 @@ INFO - Loaded 5 existing scale marking templates
 DEBUG - Template matching found 12 marking instances
 DEBUG - Morphological detection found waterline at Y=245
 DEBUG - Validation against template-suppressed region: PASSED
-INFO - Pattern-aware detection: 445.5cm (confidence: 0.970)
+INFO - Pattern-aware detection: 44.55cm (confidence: 0.970)
 ```
 
 ### Visual Debug Analysis

@@ -597,7 +597,7 @@ def generate_config_suggestions(image, manual_points=None, color_sample_data=Non
     print("-" * 30)
     print("scale:")
     print("  # Adjust total_height based on your actual scale")
-    print("  total_height: 100.0  # cm")
+    print("  total_height: 10.0   # cm - corrected from dm scale reading")
     print("  width: 8.0           # cm (estimate)")
     print("  expected_position:")
     print(f"    x_min: {x_min}")
@@ -1344,7 +1344,7 @@ def main():
         y_max = y_min + scale_height
     
     print("scale:")
-    print("  total_height: 100.0  # cm - adjust based on your actual scale")
+    print("  total_height: 45.5   # cm ")
     print("  width: 8.0           # cm - estimate")
     print("  expected_position:")
     print(f"    x_min: {x_min}")

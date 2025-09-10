@@ -158,7 +158,7 @@ INFO -   gradient: Y=278, confidence=1.000
 INFO - FORCED METHOD: Using 'enhanced_gradient' method (Y=17, confidence=0.874)
 
 # Final measurements
-INFO - Processed IMG_0154.JPG: Water level = 445.5cm
+INFO - Processed IMG_0154.JPG: Water level = 44.55cm
 ```
 
 ### Step 9: Check Debug Images
@@ -302,7 +302,7 @@ ADMIN_PASS=secure-password
 # Camera and Scale Configuration
 scale:
   # Known height of scale in cm
-  total_height: 450.0
+  total_height: 45.0   # Corrected from dm scale reading
   # Width of scale in cm (for reference)
   width: 8.0
   # Scale position in image (if fixed)
@@ -545,7 +545,7 @@ This method uses actual scale measurements for highest accuracy and incorporates
 ```bash
 # Step 1: Ensure config.yaml has accurate scale settings
 # scale:
-#   total_height: 450.0        # Actual scale height in cm
+#   total_height: 45.0   # Corrected from dm scale reading        # Actual scale height in cm
 #   expected_position:         # Approximate scale location
 #     x_min: 75
 #     x_max: 190
@@ -583,10 +583,10 @@ image_dimensions:                      # Image metadata
   height: 4032
   resized: false
 scale_measurements:                    # Actual scale readings
-  top_measurement_cm: 485.0           # Scale reading at top
-  waterline_measurement_cm: 420.0     # Scale reading at waterline
-  measurement_difference_cm: 65.0      # Actual measured difference
-  current_water_level_cm: 420.0       # Current water level
+  top_measurement_cm: 48.5            # Scale reading at top (corrected from dm)
+  waterline_measurement_cm: 42.0      # Scale reading at waterline (corrected from dm)
+  measurement_difference_cm: 6.5       # Actual measured difference (corrected from dm)
+  current_water_level_cm: 42.0        # Current water level (corrected from dm)
 reference_points:                      # Enhanced reference points
   top_of_scale: {x: 75, y: 45}        # Top of scale boundary
   bottom_of_scale: {x: 190, y: 580}   # Bottom of scale boundary
@@ -863,9 +863,9 @@ The system uses advanced RGB/HSV color filtering to detect various types of meas
 
 **Supported Scale Types:**
 
-- **Yellow scales with blue markings** 
-- **White scales with black markings** 
-- **Red scales with white markings** 
+- **Yellow scales with blue markings**
+- **White scales with black markings**
+- **Red scales with white markings**
 - **Custom color combinations** via configuration
 
 **Color Detection Features:**

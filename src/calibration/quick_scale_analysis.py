@@ -34,7 +34,7 @@ def analyze_uploaded_image():
     print("""
 scale:
   # Adjust based on your actual scale measurements
-  total_height: 50.0    # Visible range appears to be ~5cm, adjust to full scale
+  total_height: 5.0     # Visible range appears to be ~5cm, corrected from dm scale reading
   width: 5.0            # Typical ruler width
   expected_position:
     x_min: 50           # Scale starts from left edge
