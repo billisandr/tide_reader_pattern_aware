@@ -1,174 +1,69 @@
-# Pattern-Aware Water Level Detection System
+# Pattern-Aware Water Level Detection
 
-*Advanced water level detection for stadia rods using OpenCV pattern_matching*
+*Advanced water level detection for scales with complex markings and patterns*
 
-> Disclaimer: This work is part of a non-funded prototype research idea conducted at the [SenseLAB](http://senselab.tuc.gr/) of the [TUC](https://www.tuc.gr/el/archi).
+> Disclaimer: This work is part of a non-funded prototype research idea conducted at the [SenseLAB](http://senselab.tuc.gr/) of the [Technical University of Crete](https://www.tuc.gr/el/archi).
 
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
 [![OpenCV](https://img.shields.io/badge/OpenCV-4.9%2B-green.svg)](https://opencv.org/)
 [![Status](https://img.shields.io/badge/Status-Beta-orange.svg)](https://github.com/)
 
-## Overview
-
-The Pattern-Aware Water Level Detection System is an advanced module designed specifically for measuring water levels on scales that have complex markings, numbers, and repetitive patterns. Traditional detection methods often struggle with these scales because they cannot adequately distinguish between scale markings (text, numbers, lines) and actual water interfaces.
-
-This system uses multiple pattern recognition techniques to solve this fundamental problem, providing accurate water level measurements even on scales with heavy visual noise.
-
-**Key Problem Solved:** Traditional computer vision approaches fail on scales with regular markings because they detect the markings as "edges" or "interfaces" rather than the actual water surface. This system learns to recognize and suppress scale-specific patterns while accurately detecting the true water interface.
-
 ## Table of Contents
 
 - [Overview](#overview)
-- [Key Applications](#key-applications)
 - [Features](#features)
-- [Implementation Status](#implementation-status)
 - [Quick Start Guide](#quick-start-guide)
-- [Architecture](#architecture)
-- [Detection Methods](#detection-methods)
+- [Installation](#installation)
 - [Configuration](#configuration)
 - [Usage](#usage)
-- [Integration with Standard System](#integration-with-standard-system)
-- [Development Status](#development-status)
-- [Future Work](#future-work)
+  - [E-Pattern Sequential Detection](#e-pattern-sequential-detection)
+  - [Template Management](#template-management)
+- [Detection Methods](#detection-methods)
 - [Troubleshooting](#troubleshooting)
-- [Performance](#performance)
-- [Contributing](#contributing)
+- [Development](#development)
+  - [Architecture Overview](#architecture-overview)
+  - [Detection Flow Architecture](#detection-flow-architecture)
+  - [Key Classes](#key-classes)
 
-**Key Applications:**
+## Overview
 
-- **Tide gauges with numerical markings** - Scales with numbers every centimeter
-- **Industrial scales with text overlays** - Equipment with printed specifications
-- **Laboratory equipment** - Precision scales with fine markings
-- **Ruler-based measurements** - Physical rulers with cm/inch markings
-- **Vintage or weathered scales** - Older scales with faded or irregular markings
-- **Multi-language scales** - Scales with text in various languages
-- **Research instruments** - Scientific equipment with complex measurement annotations
-- **Maritime applications** - Port and harbor water level monitoring
-- **Environmental monitoring** - River and lake level measurement with marked structures
+The pattern-aware system provides specialized water level detection by using pattern recognition to identify repetitive scale markings (such as E-patterns on stadia rods) above the water surface. It leverages the key observation that scale patterns underwater appear distorted due to refraction and optical effects, while patterns above water remain clear and detectable.
+
+**Key Innovation:** Instead of trying to detect the water interface directly, this system locates repetitive, non-distorted scale markings above the water line and calculates the water level based on the position of the lowest detectable pattern. This approach significantly reduces erroneous waterline detections caused by scale markings, reflections, or visual noise.
 
 ## Features
 
-### Core Pattern Recognition Capabilities (WORKING)
+**Core Capabilities:**
 
-- **Template-Based Marking Suppression** - Learns and suppresses scale-specific marking patterns
-- **Morphological Interface Detection** - Separates horizontal water interfaces from vertical markings
-- **Multi-Method Integration Framework** - Combines multiple detection approaches for reliability
-- **Intelligent Fallback Protection** - Automatically falls back to standard detection when needed
-- **Hybrid Detection Mode** - Runs both pattern-aware and standard detection simultaneously
-- **Configuration-Driven Operation** - Extensively configurable through YAML and environment variables
-- **Zero-Risk Integration** - Completely separate from standard system, no interference
+- **E-Pattern Sequential Detection** - Finds repetitive E-shaped markings above water (5cm graduations)
+- **Pattern Recognition Above Water** - Identifies clear, undistorted scale markings on a scale above water
+- **Distortion-Based Water Level Inference** - Uses pattern distortion to determine water boundary
 
-### Advanced Features (WORKING)
+**Advanced Features:**
 
 - **Scale-Specific Adaptation** - Adapts detection parameters to individual scale characteristics
 - **Confidence Scoring** - Provides detailed reliability metrics for all detections
-- **Comprehensive Logging** - Detailed logging of pattern analysis and decision processes
-- **Debug Visualization Framework** - Foundation for pattern analysis debugging
-- **Performance Monitoring** - Tracks detection method performance and accuracy
-
-### Planned Advanced Features (FUTURE WORK)
-
-- **Automated Template Learning** - Extract marking templates directly from calibration images
-- **Advanced Pattern Classification** - Machine learning-based pattern recognition
-- **Template Persistence System** - Save, version, and share learned templates
-- **Real-Time Processing Optimization** - Optimized for continuous monitoring applications
-- **Multi-Scale Support** - Handle multiple scales in single image
-- **Adaptive Threshold Learning** - Self-adjusting detection parameters
-
-## Implementation Status
-
-### WORKING FEATURES
-
-#### Phase 1: Infrastructure (COMPLETE)
-
-- **Directory Structure** - Complete module organization
-- **Base PatternWaterDetector Class** - Main detection framework
-- **Configuration Integration** - Pattern-aware settings in config.yaml
-- **System Selection Logic** - Environment and config-based mode selection
-- **Hybrid Detection** - Simultaneous standard and pattern-aware detection
-
-#### Phase 2: Detection Methods (PARTIAL)
-
-- **Template Matching Detector** - WORKING - Suppresses learned marking patterns
-- **Morphological Detector** - WORKING - Horizontal vs vertical feature separation
-
-### FUTURE WORK FEATURES
-
-#### Phase 2: Remaining Detection Methods (PLANNED)
-
-- **Frequency Analysis Detector** - FFT-based periodicity analysis for rejecting repetitive patterns
-- **Line Segment Detector (LSD)** - Precise line detection with geometric filtering
-- **Contour Analysis Detector** - Shape-based water interface detection
-- **Integrated Pattern Detector** - Multi-method consensus system
-
-#### Phase 3: Pattern Analysis (PLANNED)
-
-- **Template Extraction** - Automated marking template extraction from calibration images
-- **Pattern Classification** - Intelligent classification of markings vs water interfaces
-- **Template Management** - Template storage, versioning, and reuse system
-- **Enhanced Calibration** - Pattern-aware calibration extensions
-
-#### Phase 4: Integration & Testing (PLANNED)
-
-- **Advanced Debug Visualization** - Pattern analysis debug images
-- **Performance Optimization** - Speed and accuracy improvements
-- **Comprehensive Testing** - Validation across different scale types
-
-## Installation
-
-### Prerequisites
-
-The pattern-aware system shares the same requirements as the standard system:
-
-- **Python 3.9+** with pip
-- **OpenCV 4.9+** for computer vision operations
-- **NumPy** for numerical computations
-- **PyYAML** for configuration management
-
-### System Dependencies
-
-```bash
-# Core dependencies (same as standard system)
-pip install opencv-python numpy scipy
-pip install PyYAML Pillow matplotlib pandas
-pip install sqlalchemy python-dotenv
-
-# Or simply:
-pip install -r requirements.txt
-```
-
-### Pattern-Aware System Installation
-
-The pattern-aware system is already included in the project structure. No additional installation is required beyond the standard system dependencies.
-
-```bash
-# Verify installation
-python -c "from src_pattern_aware.pattern_water_detector import PatternWaterDetector; print('Pattern-aware system ready')"
-```
-
-### Directory Structure Setup
-
-```bash
-# Ensure pattern template directories exist
-mkdir -p data/pattern_templates/scale_markings
-mkdir -p data/pattern_templates/calibration_patterns
-mkdir -p data/debug/pattern_analysis
-```
+- **Comprehensive Logging** - Detailed pattern analysis and decision process tracking
+- **Debug Visualization** - Pattern analysis debugging framework
 
 ## Quick Start Guide
 
 ### Step 1: Enable Pattern-Aware Detection
 
-**Method 1: Environment Variable (Recommended for Testing)**
+**Environment Variable Method (Recommended):**
 
 ```bash
 # Windows Command Prompt
 set PATTERN_AWARE_MODE=true
 python src_pattern_aware/main_pattern_aware.py
+
+# Linux/Mac
+export PATTERN_AWARE_MODE=true
+python src_pattern_aware/main_pattern_aware.py
 ```
 
-**Method 2: Configuration File**
+**Configuration File Method:**
 
 ```yaml
 # In config.yaml
@@ -177,1053 +72,441 @@ pattern_processing:
 
 detection:
   pattern_aware:
-    enabled: true
+    engine: 'integrated_pattern'
+    fallback_to_standard: true
+    
+    e_pattern_detection:
+      enabled: true
+      single_e_cm: 5.0                # Each E-pattern represents 5cm
+      match_threshold: 0.7           
+      max_consecutive_failures: 6
 ```
 
-### Step 2: Run Detection
+### Step 2: Extract E-Pattern Templates
 
 ```bash
-# Using pattern-aware entry point
+# Interactive template extraction tool
+python src_pattern_aware/interactive_template_extractor.py
+```
+
+**Follow the prompts:**
+
+1. Select template type (E_pattern_black or E_pattern_white)
+2. Click on clear E-shaped markings in the image
+3. Templates are automatically saved for reuse
+
+### Step 3: Run Detection
+
+```bash
+# Pattern-aware detection
 python src_pattern_aware/main_pattern_aware.py
 
-# Or using hybrid mode (runs both systems)
+# Hybrid mode (runs both standard and pattern-aware)
 set PATTERN_AWARE_MODE=hybrid
 python src_pattern_aware/main_pattern_aware.py
 ```
 
-### Step 3: Monitor Results
-
-**Expected Log Output:**
+### Expected Results
 
 ```
 INFO - Starting Pattern-Aware Water Level Detection System
-INFO - Selected detection system: pattern_aware
-INFO - Pattern-Aware Water Level Detector Initialized
-INFO - Initialized 2 pattern detection methods
-INFO - Template matching detector initialized (threshold: 0.7)
-INFO - Morphological detector initialized (h_kernel: [40, 1], v_kernel: [1, 40])
-```
-
-### Step 4: Compare with Standard Detection
-
-```bash
-# Run hybrid mode for comparison
-set PATTERN_AWARE_MODE=hybrid
-python src_pattern_aware/main_pattern_aware.py
-```
-
-**Hybrid Output Example:**
-
-```
-INFO - Hybrid processing: IMG_0154.JPG
-INFO - Running standard detection...
-INFO - Standard detection: 301.3cm (confidence: 0.886)
-INFO - Running pattern-aware detection...
+INFO - Loading E-pattern templates: 2 templates loaded
+INFO - Processing IMG_0154.JPG...
+INFO - E-pattern detection: Found 8 clear patterns above water surface
+INFO - Underwater patterns: Distorted/undetectable (indicating water boundary)
+INFO - Scale measurement: 8 E-patterns × 5cm = 40cm above water
 INFO - Pattern-aware detection: 44.55cm (confidence: 0.950)
+INFO - Standard detection: 42.1cm (confidence: 0.886)
 INFO - Selected pattern-aware result (higher confidence)
 ```
 
-## Architecture
+## Installation
 
-### System Structure
-
-```
-src_pattern_aware/
-├── main_pattern_aware.py              # Entry point with system selection
-├── pattern_water_detector.py          # Main pattern-aware detector
-├── hybrid_detector.py                 # Hybrid detection (both systems)
-├── detection_methods/                 # Individual detection algorithms
-│   ├── template_matching.py           # WORKING: Template-based suppression
-│   ├── morphological_detector.py      # WORKING: Horizontal interface detection
-│   ├── frequency_analyzer.py          # PLANNED: FFT periodicity analysis
-│   ├── lsd_detector.py               # PLANNED: Line Segment Detector
-│   ├── contour_analyzer.py           # PLANNED: Geometric contour analysis
-│   └── integrated_detector.py        # PLANNED: Multi-method integration
-├── pattern_analysis/                  # PLANNED: Pattern recognition utilities
-│   ├── marking_extractor.py          # Template extraction from calibration
-│   ├── pattern_classifier.py         # Marking vs water classification
-│                                      # (template_manager.py removed - was stub implementation)
-└── utils/                            # PLANNED: Pattern-specific utilities
-    ├── image_processing.py           # Pattern image processing
-    ├── geometric_utils.py            # Geometric analysis
-    └── frequency_utils.py            # FFT utilities
-```
-
-### Data Flow
-
-```
-Image Input
-     │
-     ▼
-┌─────────────────┐
-│ System Selector │ ── Environment vars or config.yaml
-│ (main_pattern_ │    determine detection mode
-│ aware.py)      │
-└─────────────────┘
-     │
-     ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│ Standard        │    │ Pattern-Aware   │    │ Hybrid          │
-│ Detection       │    │ Detection       │    │ Detection       │
-│ (fallback)      │    │ (primary)       │    │ (comparison)    │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                              │
-                              ▼
-                    ┌─────────────────┐
-                    │ Template        │ ── Learn scale markings
-                    │ Matching        │
-                    └─────────────────┘
-                              │
-                              ▼
-                    ┌─────────────────┐
-                    │ Morphological   │ ── Horizontal vs vertical
-                    │ Detection       │    feature separation
-                    └─────────────────┘
-                              │
-                              ▼
-                    ┌─────────────────┐
-                    │ Result          │
-                    │ Integration     │
-                    └─────────────────┘
-```
-
-## Detection Methods
-
-### Template Matching (WORKING)
-
-**Purpose:** Learn and suppress scale-specific markings
-
-**Process:**
-
-1. Load scale marking templates from calibration
-2. Match templates against scale region
-3. Mask out detected markings
-4. Detect water interface in unmarked areas
-
-**Configuration:**
-
-```yaml
-detection:
-  pattern_aware:
-    template_matching:
-      enabled: true
-      threshold: 0.7                    # Template match confidence
-      max_templates: 10                 # Maximum templates to store
-      template_source: 'local'          # Template source: 'local', 'manager', 'both'
-      use_default_templates: true       # Create default stadia rod templates
-```
-
-**Dual Template Sourcing:**
-
-The template matching system supports flexible template sourcing:
-
-- **'local'**: Uses built-in default templates (E-patterns, lines, thick lines)
-- **'manager'**: Uses external template manager (when available)
-- **'both'**: Combines local and external templates for maximum coverage
-
-**Environment Variable Override:**
+The pattern-aware system uses the same dependencies as the standard system:
 
 ```bash
-set TEMPLATE_SOURCE=both              # Override config template source
-set USE_DEFAULT_TEMPLATES=true        # Override default template creation
+# Install dependencies
+pip install -r requirements.txt
+
+# Create pattern template directories
+mkdir -p data/pattern_templates/scale_markings
+mkdir -p data/debug/pattern_analysis
+
+# Verify installation
+python -c "from src_pattern_aware.pattern_water_detector import PatternWaterDetector; print('Pattern-aware system ready')"
 ```
-
-**Status:** FULLY IMPLEMENTED AND WORKING
-
-### E-Pattern Detection (WORKING)
-
-**Purpose:** Sequential detection of E-shaped scale markings for precise water level measurement using scale-invariant template matching
-
-**Key Innovation:** Templates are used **only for shape reference**, not size constraints. This approach proved more successful than template resizing methods which were limiting and unsuccessful in pattern recognition.
-
-**Scale-Invariant Process:**
-
-1. Load base E-pattern templates (black and white variants)
-2. Generate 44 template variants per base template:
-   - **11 different scales** (0.3x, 0.4x, 0.5x, 0.6x, 0.7x, 0.8x, 0.9x, 1.0x, 1.2x, 1.5x, 2.0x)
-   - **2 orientations** (normal and 180-degree flipped)
-   - **2 base patterns** (black and white E-patterns)
-3. Perform top-to-bottom sequential pattern matching
-4. Test all template variants to find natural size in input image
-5. Use detected patterns for water level calculation (5cm per pattern)
-
-**Key Features:**
-- **Scale-invariant detection**: Finds E-patterns regardless of image resolution, zoom level, or camera distance
-- **Shape-only matching**: Templates adapt to natural pattern size without forced resizing
-- **Multi-scale testing**: Automatically tests 11 different template scales
-- **Multi-orientation support**: Detects both normal and 180-degree flipped E-patterns
-- **No size validation**: Eliminates template sizing limitations that caused recognition failures
-- **Natural size detection**: Lets template matching find patterns at their actual scale
-- **Sequential water detection**: Stops when pattern matching fails (water reached)
-
-**Template Approach:**
-- **Original approach (abandoned)**: Resize templates to match expected pixel/cm ratios
-- **New approach (successful)**: Use templates at multiple scales for shape recognition only
-- **Key insight**: Resizing templates to match calibration proved limiting and unsuccessful
-- **Success factor**: Multi-scale testing finds patterns at their natural size in images
-
-**Configuration:**
-
-```yaml
-detection:
-  pattern_aware:
-    e_pattern_detection:
-      enabled: true                   # Enable E-pattern sequential detector
-      match_threshold: 0.6            # Template matching confidence threshold
-      single_e_cm: 5.0               # Each E-pattern represents 5cm (for measurement only)
-      max_consecutive_failures: 10   # Stop detection after N failures (water reached)
-      support_flipped: true          # Support 180-degree flipped patterns
-```
-
-**Template Requirements:**
-- **Base templates needed**: 2 files in `data/pattern_templates/scale_markings/`
-  - `E_pattern_black.png` - E-shaped black scale marking (size-independent)
-  - `E_pattern_white.png` - E-shaped white scale marking (size-independent)
-- **Auto-generated variants**: 44 total template variants (22 per base template)
-- **Scale factors**: Templates tested at 11 different scales automatically
-- **Orientations**: Both normal and 180-degree flipped variants created
-- **Purpose**: Shape recognition only - no size constraints applied
-
-**Debug Output:**
-- **Location**: `data/debug/e_pattern_detection/`
-- **Annotated images**: Shows detected patterns with color-coded rectangles
-- **Match information**: Detailed logs with confidence scores and scale detection
-- **Multi-scale analysis**: Information about which template scales were successful
-
-**Status:** FULLY IMPLEMENTED AND WORKING - Scale-invariant approach successful
-
-### Hybrid Waterline Analyzer (WORKING)
-
-**Purpose:** Post-process E-pattern detection results to improve waterline accuracy through systematic gradient analysis below the last detected pattern.
-
-**Key Innovation:** Replaces anomaly-based suspicious region detection with a systematic scanning approach that follows the correct physical waterline detection pipeline.
-
-**Correct Detection Pipeline:**
-
-1. **Step A: Detect Consecutive Valid E-Patterns**
-   - Use no-gap and no-significant scale/size deviation rules
-   - Establish baseline from consecutive good pattern sequence
-   - Determine bottom of last good pattern as reference point
-
-2. **Step B: Define First Suspect Region**  
-   - Start search at bottom of last valid E-pattern with configurable buffer
-   - Buffer accounts for cases where last pattern might be partially underwater
-   - Buffer = `underwater_buffer_percentage` × average pattern height
-
-3. **Step C: Create Systematic Scan Regions**
-   - Generate multiple search regions extending downward from first region
-   - Cover area systematically rather than relying on pattern anomalies
-   - Each region sized for effective gradient detection
-
-4. **Step D: Enhanced Y-Axis Gradient Analysis with Combined Metric Detection**
-   - Use vertical gradients (Y-axis changes) to detect horizontal waterline transitions
-   - Apply Sobel operator: `cv2.Sobel(roi, cv2.CV_64F, 0, 1, ksize=kernel_size)`
-   - **Combined Metric Approach**: Integrate multiple waterline indicators:
-     - **Blue Signature**: Raw negative Sobel gradients indicating water darkness
-     - **Gradient Differentials**: Traditional negative gradient differences 
-     - **Edge Magnitude**: Transition sharpness for supporting evidence
-   - Focus on row-wise gradient changes that indicate water interface transition
-
-**Configuration:**
-
-```yaml
-detection:
-  pattern_aware:
-    waterline_verification:
-      enabled: true                           # Enable hybrid waterline analysis
-      min_pattern_confidence: 0.6             # Minimum confidence for accepting results
-      gradient_kernel_size: 3                 # Sobel operator kernel size
-      gradient_threshold: 30                  # Minimum gradient change threshold
-      negative_gradient_threshold: 25         # Minimum absolute value for negative gradient differentials
-      negative_sobel_threshold: 50            # Threshold for negative raw Sobel gradients (blue signature detection)
-      enable_fallback_regions: true           # Enable extended regions below primary region
-      pattern_analysis:
-        min_consecutive_patterns: 3           # Minimum consecutive good patterns needed
-        baseline_buffer_percentage: 0.3      # Symmetric buffer around baseline (30% of pattern height)
-```
-
-**Key Improvements Over Previous Approach:**
-
-- **Physical Accuracy**: Waterline search only occurs below established good patterns
-- **No Anomaly Dependence**: Doesn't require detecting anomalous patterns to define regions
-- **Systematic Coverage**: Scans complete area below last good pattern methodically  
-- **Correct Gradient Direction**: Uses Y-axis gradients for horizontal waterline detection
-- **Combined Metric Detection**: Integrates multiple waterline signatures for robust detection:
-  - Raw Sobel gradients for blue signature detection
-  - Gradient differentials for traditional transition detection
-  - Edge magnitude for transition sharpness assessment
-- **Configurable Buffering**: Accounts for partially underwater patterns with user-tunable buffer
-- **Region Control**: Optional fallback regions for extended coverage when needed
-- **Enhanced Confidence Scoring**: Proportional scoring based on multiple waterline indicators
-
-**Debug Output:**
-- **Location**: Integrated with pattern-aware debug visualizer session directories
-- **Verification Analysis**: Shows systematic scan regions and gradient candidates
-- **Gradient Visualization**: Y-axis gradient magnitude with detected transitions
-- **Buffer Information**: Displays buffer calculations and constraint enforcement
-
-**Candidate Density-Based Clustering (NEW - WORKING):**
-
-**Purpose:** Improve candidate selection by identifying regions with high candidate density rather than relying solely on individual confidence scores.
-
-**Key Innovation:** Multiple waterline detection methods often produce several candidates near the true waterline. Instead of simply selecting the highest confidence candidate, clustering analysis finds regions with the highest density of candidates and selects the most representative candidate from that cluster.
-
-**Clustering Process:**
-
-1. **Confidence-Based Cluster Centers**: Use top N confidence candidates (default: 10) as potential cluster centers
-2. **Density Analysis**: For each cluster center, count candidates within configurable height region (default: 5.0cm)  
-3. **Best Cluster Selection**: Select cluster center with maximum candidate density
-4. **Candidate Selection**: Within best cluster, choose either:
-   - **Highest confidence candidate** (`use_median_selection: false`)
-   - **Median position candidate** (`use_median_selection: true`) with cluster average confidence
-
-**Configuration:**
-
-```yaml
-detection:
-  pattern_aware:
-    waterline_verification:
-      candidate_clustering:
-        enabled: true                     # Enable density-based candidate selection
-        cluster_height_cm: 5.0            # Height of clustering region in cm
-        min_candidates_in_cluster: 2      # Minimum candidates required to form a cluster
-        use_median_selection: false       # Use median instead of highest confidence within cluster
-        max_cluster_centers: 10           # Maximum number of top candidates to evaluate as cluster centers
-```
-
-**Benefits:**
-- **Robust to outliers**: Reduces impact of single high-confidence noise candidates
-- **Spatial intelligence**: Considers physical proximity of candidates in cm
-- **Efficient computation**: Only evaluates top confidence candidates as cluster centers
-- **Configurable approach**: Adjustable cluster size and selection method
-
-**Debug Output:** Clustering analysis is included in waterline gradient analysis text files, showing:
-- Cluster centers evaluated and their densities
-- Selected cluster information and candidates within cluster
-- Comparison between original confidence ranking and clustering result
-
-**Integration**: Automatically applied after gradient analysis when candidate clustering is enabled. Falls back to original confidence ranking if no suitable clusters are found.
-
-**Status:** FULLY IMPLEMENTED AND WORKING - Confidence-based clustering approach successful
-
-### Morphological Detection (WORKING)
-
-**Purpose:** Separate horizontal water interfaces from vertical scale markings
-
-**Process:**
-
-1. Create horizontal and vertical morphological kernels
-2. Extract horizontal features (water interfaces)
-3. Suppress vertical features (scale markings)
-4. Find strongest horizontal interface
-
-**Configuration:**
-
-```yaml
-detection:
-  pattern_aware:
-    morphological:
-      enabled: true
-      horizontal_kernel_size: [40, 1]  # Horizontal feature detection
-      vertical_kernel_size: [1, 40]    # Vertical feature suppression
-```
-
-**Status:** FULLY IMPLEMENTED AND WORKING
-
-### Frequency Analysis (PLANNED)
-
-**Purpose:** Reject periodic marking patterns using FFT analysis
-
-**Process:**
-
-1. Analyze frequency content of horizontal lines
-2. Identify periodic patterns (markings)
-3. Select lines with low periodicity (water interfaces)
-
-**Status:** NOT YET IMPLEMENTED
-
-### Line Segment Detector (PLANNED)
-
-**Purpose:** Precise line detection with geometric filtering
-
-**Process:**
-
-1. Use OpenCV's Line Segment Detector
-2. Filter for horizontal, continuous lines
-3. Validate water interface characteristics
-
-**Status:** NOT YET IMPLEMENTED
-
-### Contour Analysis (PLANNED)
-
-**Purpose:** Geometric shape-based interface detection
-
-**Process:**
-
-1. Analyze contour properties
-2. Filter for water interface geometry
-3. Reject text/number shapes
-
-**Status:** NOT YET IMPLEMENTED
 
 ## Configuration
 
-### Pattern Processing Mode
+### Pattern-Aware Settings
 
 ```yaml
+detection:
+  pattern_aware:
+    engine: 'integrated_pattern'      # Pattern detection engine
+    fallback_to_standard: true        # Fall back to standard methods if needed
+    
+    # E-pattern sequential detection
+    e_pattern_detection:
+      enabled: true                   
+      single_e_cm: 5.0                # Each E-pattern represents 5cm
+      match_threshold: 0.7            # Template matching threshold
+      max_consecutive_failures: 6     # Stop after N failures (water reached)
+      support_flipped: false          # Support 180-degree flipped patterns
+    
+    # Template matching settings
+    template_matching:
+      enabled: true
+      threshold: 0.75                 # Template match confidence
+      max_templates: 10               # Maximum templates to store
+      template_source: 'manager'      # Options: 'local', 'manager', 'both'
+      use_default_templates: true     # Create default stadia rod templates
+      
+      # Advanced template matching preprocessing
+      preprocessing:
+        mean_shift_filtering: true      # Apply mean shift filtering for noise reduction
+        adaptive_thresholding: true     # Use adaptive thresholding for better contrast
+        morphological_cleaning: true    # Apply morphological operations
+      
+      # Non-Maximum Suppression for overlapping detections
+      nms:
+        enabled: true                   # Enable Non-Maximum Suppression
+        threshold: 0.4                  # NMS overlap threshold
+        confidence_threshold: 0.5       # Minimum confidence for NMS
+      
+      # Template-specific thresholds (override global threshold)
+      template_thresholds:
+        e_major: 0.6                    # E-pattern major graduations
+        line_minor: 0.7                 # Simple line minor graduations
+        line_thick: 0.65                # Thick line intermediate graduations
+        number_marking: 0.5             # Number markings on rod
+        l_major: 0.6                    # L-shaped major graduations
+    
+    # Additional detection methods
+    morphological:
+      enabled: true
+      horizontal_kernel_size: [40, 1]   # Horizontal feature detection
+      vertical_kernel_size: [1, 40]     # Vertical feature suppression
+    
+    frequency_analysis:
+      enabled: true
+      periodicity_threshold: 0.3        # Max periodicity for water interface
+    
+    line_detection:
+      enabled: true
+      min_line_length_ratio: 0.6        # Minimum line length (% of scale width)
+      max_angle_deviation: 10           # Max angle from horizontal (degrees)
+    
+    contour_analysis:
+      enabled: true
+      min_aspect_ratio: 10              # Minimum width/height ratio
+      min_width_ratio: 0.5              # Minimum width (% of scale width)
+    
+    # Hybrid waterline verification system
+    waterline_verification:
+      enabled: true                     # Enable hybrid waterline verification
+      enable_fallback_regions: false   # Enable extended regions below primary region
+      min_pattern_confidence: 0.7      # Minimum confidence for waterline detection
+      gradient_kernel_size: 3          # Sobel kernel size for gradient analysis
+      gradient_threshold: 25           # Threshold for significant gradient changes
+      negative_gradient_threshold: 25  # Negative gradient differentials threshold
+      negative_sobel_threshold: 40     # Blue signature detection threshold
+      
+      # Pattern analysis thresholds
+      pattern_analysis:
+        # Consecutive pattern detection
+        scale_consistency_threshold: 0.15    # Scale factor consistency (±15%)
+        size_consistency_threshold: 0.15     # Size consistency (±15%) 
+        spacing_consistency_threshold: 0.10  # Spacing consistency (±10%)
+        min_consecutive_patterns: 0          # Minimum consecutive patterns required
+        
+        # Anomaly detection thresholds
+        scale_anomaly_threshold: 0.20        # Scale factor change for suspicious regions
+        size_anomaly_threshold: 0.20         # Size change for suspicious regions
+        aspect_ratio_anomaly_threshold: 0.20 # Aspect ratio change for suspicious regions
+        max_gap_ratio: 0.5                   # Max gap between patterns
+        
+        # Baseline buffer - symmetric coverage around last detected pattern
+        baseline_buffer_percentage: 0.6      # Buffer as % of avg pattern height
+      
+      # Candidate clustering for improved selection
+      candidate_clustering:
+        enabled: true                   
+        cluster_height_cm: 5.0          # Height of clustering region in cm
+        min_candidates_in_cluster: 2    # Minimum candidates to form cluster
+        use_median_selection: false     # Use highest confidence vs median position
+        max_cluster_centers: 10         # Maximum cluster centers to evaluate
+
 pattern_processing:
-  mode: 'standard'                    # Options: 'standard', 'pattern_aware', 'hybrid'
-  debug_patterns: false               # Save pattern analysis debug images
+  mode: 'pattern_aware'               # Options: 'standard', 'pattern_aware', 'hybrid'
+  debug_patterns: true                # Save pattern analysis debug images
   save_templates: true                # Save extracted templates for reuse
   template_directory: 'data/pattern_templates/scale_markings'
 ```
 
-### Detection Method Configuration
-
-```yaml
-detection:
-  pattern_aware:
-    enabled: false                    # Master enable/disable
-    engine: 'integrated_pattern'      # Pattern detection engine (PLANNED)
-    fallback_to_standard: true        # Fall back to standard methods if pattern fails
-    
-    template_matching:                # WORKING
-      enabled: true
-      threshold: 0.7
-      max_templates: 10
-    
-    morphological:                    # WORKING
-      enabled: true
-      horizontal_kernel_size: [40, 1]
-      vertical_kernel_size: [1, 40]
-    
-    frequency_analysis:               # PLANNED
-      enabled: true
-      periodicity_threshold: 0.3
-    
-    line_detection:                   # PLANNED
-      enabled: true
-      min_line_length_ratio: 0.6
-      max_angle_deviation: 10
-    
-    contour_analysis:                 # PLANNED
-      enabled: true
-      min_aspect_ratio: 10
-      min_width_ratio: 0.5
-```
-
-### Environment Variables
-
-```bash
-# Primary mode selection
-PATTERN_AWARE_MODE=true              # Enable pattern-aware detection
-PATTERN_AWARE_MODE=hybrid            # Enable hybrid mode (both systems)
-PATTERN_AWARE_MODE=false             # Force standard detection
-
-# Template configuration
-TEMPLATE_SOURCE=local                # Template source: 'local', 'manager', 'both'
-USE_DEFAULT_TEMPLATES=true           # Enable/disable default stadia rod templates
-
-# Debug options
-PATTERN_DEBUG=true                   # Enable pattern analysis debugging
-DEBUG_MODE=true                      # Enable general debug mode
-```
-
 ## Usage
 
-### Basic Usage
+### E-Pattern Sequential Detection
+
+The E-pattern detector uses scale-invariant template matching to find repetitive E-shaped markings above water:
+
+```python
+from src_pattern_aware.detection_methods.e_pattern_detector import EPatternDetector
+
+# Detector automatically loads templates from data/pattern_templates/scale_markings/
+detector = EPatternDetector(config, calibration_data)
+
+# Scale-invariant detection with multi-scale template matching  
+result = detector.detect_patterns(image, scale_region)
+print(f"Template variants tested: {detector.get_template_count()}")  # 44 total (11 scales × 2 orientations × 2 patterns)
+print(f"Clear patterns above water: {result['patterns_above_water']}")
+print(f"Scale above water: {result['scale_above_water_cm']}cm")
+```
+
+**Key Features:**
+
+- **Multi-scale matching**: Tests 11 scale factors (0.3x to 2.0x) to find patterns at natural size
+- **Orientation support**: Detects normal and 180° flipped patterns
+- **Sequential scanning**: 2-pixel step size from top to bottom until consecutive failures
+- **Shape-only recognition**: No size constraints - templates adapt to natural pattern size
+
+### Template Management
+
+The system supports multiple approaches for managing E-pattern templates:
+
+**Direct Template Placement (Easiest Method)**
 
 ```bash
-# Standard detection (existing system)
-python src/main.py
-
-# Pattern-aware detection
-set PATTERN_AWARE_MODE=true
-python src_pattern_aware/main_pattern_aware.py
-
-# Hybrid detection (compare both systems)
-set PATTERN_AWARE_MODE=hybrid
-python src_pattern_aware/main_pattern_aware.py
+# Create custom template images and place them directly:
+data/pattern_templates/scale_markings/
+├── e_template_black_[timestamp].png    # Your black E-pattern template
+├── e_template_white_[timestamp].png    # Your white E-pattern template
+├── custom_marking_[name].png           # Any custom marking template
+└── [any_filename].png                  # System auto-detects all templates
 ```
 
-### Integration with Existing Workflow
+**Template Requirements:**
 
-The pattern-aware system is designed to be a drop-in replacement:
+- **Size**: Any size (system scales automatically for matching)
+- **Format**: PNG, JPG, JPEG, BMP, TIFF supported
+- **Content**: Clear, undistorted patterns from above-water regions
+- **Naming**: Any filename (timestamp format optional for organization)
+
+**Manual Template Extraction Tools**
 
 ```bash
-# Replace your existing command:
-# python src/main.py
+# Interactive extraction from calibration images
+python src_pattern_aware/interactive_template_extractor.py
 
-# With pattern-aware version:
-set PATTERN_AWARE_MODE=true
-python src_pattern_aware/main_pattern_aware.py
+# Batch processing (if available)
+python src_pattern_aware/extract_templates.py --scale-type stadia_rod
 ```
 
-All output formats (CSV, JSON, database) remain the same.
+## Detection Methods
 
-#### Annotated Images Output
+### E-Pattern Sequential Detector
 
-Pattern-aware detection creates annotated images in `data/debug_pattern_aware/` showing visual results:
+- **Implementation**: Scale-invariant template matching with multi-scale testing
+- **Templates**: 44 variants per base template (11 scales × 2 orientations × 2 patterns)
+- **Scanning**: Top-to-bottom with 2-pixel steps, stops at consecutive failures (default: 10)
+- **Measurement**: Each detected E-pattern = 5cm, water level calculated from pattern count
+- **Stopping Logic**: Pattern visibility indicates water boundary - distorted patterns mark submersion
 
-- **Success Images**: Green water lines with pattern detection overlays
-- **Failed Images**: Red diagnostic overlays showing what pattern methods were attempted  
-- **Pattern Analysis**: Shows template matches, morphological analysis, frequency analysis results
+### Hybrid Waterline Analyzer
 
-Unlike debug images (which show processing steps), annotated images provide final visual summaries suitable for documentation and verification.
+- **Trigger**: Automatically applied when ≥2 E-patterns detected successfully
+- **Method**: Y-axis gradient analysis below last detected pattern using Sobel operators
 
-### Template Extraction
+**Waterline Region Calculation Process**:
 
-#### Interactive E-Template Extractor (Recommended)
-Extract E-shaped templates interactively with visual feedback:
+1. **Consecutive Pattern Validation** - Establish baseline from consistent patterns:
+   - Analyze detected E-patterns for scale, size, and spacing consistency
+   - Apply thresholds: scale (±15%), size (±15%), spacing (±10%)
+   - Identify last valid E-pattern that meets consecutive pattern criteria
 
-```bash
-cd src_pattern_aware
-python interactive_template_extractor.py
-```
+2. **Baseline Reference Point Establishment**:
+   - Calculate bottom of last valid E-pattern: `reference_y = pattern_center_y + (pattern_height / 2)`
+   - This becomes the baseline for waterline search regions
 
-This tool extracts black and white E-shaped templates (5cm markings) with immediate visual feedback.
+3. **Symmetric Buffer Region Creation**:
+   - Calculate buffer size: `buffer_pixels = average_pattern_height × baseline_buffer_percentage (0.6)`
+   - Primary search region: `[reference_y - buffer_pixels, reference_y + buffer_pixels]`
+   - Provides symmetric coverage above/below the pattern bottom (60% of pattern height each direction)
 
-#### Programmatic Template Extraction
-```bash
-# Extract templates from calibration image
-python -c "
-from src_pattern_aware.pattern_water_detector import PatternWaterDetector
-detector = PatternWaterDetector(config, pixels_per_cm, calib_data)
-detector.extract_and_save_templates('data/calibration/calibration_image.jpg')
-"
-```
+4. **Extended Region Generation** (if enabled):
+   - Create additional systematic scan regions extending downward from primary region
+   - Each region height: configurable (default: 20 pixels)
+   - Regions continue until scale boundary or maximum scan depth reached
 
-## Integration with Standard System
+5. **Y-Axis Gradient Analysis**:
+   - Apply Sobel operators for vertical gradient detection within each region
+   - Combined metric detection: Blue signature + gradient differentials + edge magnitude
+   - Generate waterline candidates with confidence scores
 
-### Zero-Risk Architecture
+6. **Candidate Clustering**:
+   - Group candidates within 5cm height regions using density-based clustering
+   - Select best candidate from highest-density cluster
+   - Cross-validate with original E-pattern water level calculation
 
-The pattern-aware system is completely separate from the standard system:
+**Key Innovation**: Uses bottom of last detectable E-pattern as physical reference point for waterline search, ensuring search occurs in the correct location where patterns transition from clear (above water) to distorted (underwater).
 
-- **Separate directory:** `src_pattern_aware/` vs `src/`
-- **No modifications** to existing code
-- **Independent operation** - can be disabled without affecting standard system
-- **Fallback protection** - automatically uses standard detection if pattern detection fails
+### Integrated Detector Priority Chain
 
-### Migration Strategy
+1. **E-Pattern Sequential** (highest priority) - Scale-invariant pattern matching
+2. **Hybrid Waterline Analysis** - Post-processing gradient validation
+3. **Template Matching** (fallback) - General pattern suppression
+4. **Morphological Detection** (fallback) - Horizontal vs vertical separation
+5. **Standard Detection** (final fallback) - Color/edge-based methods
 
-1. **Test phase:** Use hybrid mode to compare results
-2. **Validation phase:** Run pattern-aware mode on known images
-3. **Production phase:** Switch to pattern-aware mode for problematic scales
-4. **Rollback capability:** Can instantly return to standard system if needed
+### Combined Metric Waterline Detection
 
-### Configuration Coexistence
-
-Both systems share the same config.yaml file but use different sections:
-
-```yaml
-# Standard system configuration (unchanged)
-detection:
-  method: 'integrated'
-  forced_method: 'enhanced_gradient'
-
-# Pattern-aware system configuration (new)
-pattern_processing:
-  mode: 'standard'  # Disabled by default
-
-detection:
-  pattern_aware:
-    enabled: false  # Disabled by default
-```
-
-## Development Status
-
-### Current State: FUNCTIONAL PROTOTYPE
-
-The system currently provides:
-
-- **Working template matching detection** - Can suppress learned scale markings
-- **Working morphological detection** - Separates horizontal from vertical features
-- **Complete configuration integration** - Full YAML and environment variable support
-- **Hybrid detection capability** - Can run both systems and compare results
-- **Fallback protection** - Automatic fallback to standard methods
-
-### Limitations
-
-- **Limited detection methods** - Only 2 of 5 planned methods implemented
-- **No template learning** - Templates must be manually provided
-- **Basic pattern classification** - Advanced pattern analysis not yet implemented
-- **No performance optimization** - Focus has been on functionality over speed
-
-### Testing Status
-
-- **Architecture testing** - System selection and configuration loading tested
-- **Individual method testing** - Template matching and morphological detection tested
-- **Integration testing** - NOT YET COMPLETED
-- **Performance testing** - NOT YET COMPLETED
-- **Comparative analysis** - NOT YET COMPLETED
-
-## Future Work
-
-### High Priority
-
-1. **Complete Phase 2** - Implement remaining detection methods (frequency, LSD, contour)
-2. **Template Learning** - Automated template extraction from calibration images
-3. **Integration Testing** - Comprehensive testing across different scale types
-4. **Performance Optimization** - Speed and memory usage improvements
-
-### Medium Priority
-
-1. **Advanced Pattern Classification** - Machine learning-based pattern recognition
-2. **Template Management System** - Version control and sharing of templates
-3. **Enhanced Debug Visualization** - Comprehensive pattern analysis debug images
-4. **Configuration Validation** - Input validation and error handling
-
-### Low Priority
-
-1. **Multi-Scale Support** - Handle multiple scales in single image
-2. **Real-Time Optimization** - Video stream processing capabilities
-3. **Cloud Integration** - Template sharing and collaborative learning
-4. **Mobile Support** - Smartphone-based detection
-
-## Project Structure
-
-```
-src_pattern_aware/                     # Pattern-aware detection module
-├── README.md                          # This documentation
-├── main_pattern_aware.py              # Main entry point with system selection
-├── pattern_water_detector.py          # Core pattern-aware detector
-├── hybrid_detector.py                 # Hybrid detection (both systems)
-├── detection_methods/                 # Individual detection algorithms
-│   ├── template_matching.py           # WORKING: Template-based suppression
-│   ├── morphological_detector.py      # WORKING: Horizontal interface detection
-│   ├── frequency_analyzer.py          # PLANNED: FFT periodicity analysis
-│   ├── lsd_detector.py               # PLANNED: Line Segment Detector
-│   ├── contour_analyzer.py           # PLANNED: Geometric contour analysis
-│   └── integrated_detector.py        # PLANNED: Multi-method integration
-├── pattern_analysis/                  # PLANNED: Pattern recognition utilities
-│   ├── marking_extractor.py          # Template extraction from calibration
-│   ├── pattern_classifier.py         # Marking vs water classification
-│                                      # (template_manager.py removed - was stub implementation)
-└── utils/                            # PLANNED: Pattern-specific utilities
-    ├── image_processing.py           # Pattern image processing
-    ├── geometric_utils.py            # Geometric analysis
-    └── frequency_utils.py            # FFT utilities
-
-data/pattern_templates/               # Pattern template storage
-├── scale_markings/                   # Learned scale marking templates
-└── calibration_patterns/             # Calibration-derived patterns
-```
+- **Blue Signature Detection**: Raw negative Sobel gradients indicate water darkness
+- **Gradient Differential Analysis**: Traditional transition detection between materials
+- **Edge Magnitude Assessment**: Transition sharpness for confidence scoring
+- **Proportional Scoring**: Stronger signals contribute more to final confidence
 
 ## Troubleshooting
 
 ### Common Issues
 
-**"Pattern detection not enabled" error:**
+**Low Detection Confidence:**
 
-- **Solution**: Check `PATTERN_AWARE_MODE` environment variable
-- **Solution**: Verify `pattern_processing.mode` in config.yaml
-- **Solution**: Ensure `detection.pattern_aware.enabled: true`
-- **Verification**: Look for log message "Pattern-Aware Water Level Detector Initialized"
-
-**"No templates available" warning:**
-
-```
-WARNING - No templates available, using template-free detection
-```
-
-- **Status**: Currently normal - template learning not yet implemented
-- **Workaround**: System will use morphological detection methods
-- **Impact**: Reduced accuracy on heavily marked scales, but still functional
-
-**"Both detection systems failed" error:**
-
-- **Check**: Calibration data validity using standard system first
-- **Check**: Scale region extraction in debug images
-- **Debug**: Enable `DEBUG_MODE=true` for detailed logging
-- **Solution**: Verify scale boundaries in config.yaml match image content
-
-**Performance issues:**
-
-- **Cause**: Current implementation prioritizes functionality over speed
-- **Workaround**: Use standard system for time-critical applications
-- **Timeline**: Performance optimizations planned for Phase 4
-
-**ImportError: Cannot import pattern detection modules:**
-
-```
-ImportError: cannot import name 'PatternWaterDetector' from 'src_pattern_aware.pattern_water_detector'
+```yaml
+# Adjust detection thresholds
+detection:
+  pattern_aware:
+    e_pattern_detection:
+      match_threshold: 0.6  # Lower threshold (was 0.7)
+    template_matching:
+      threshold: 0.65       # Lower threshold (was 0.75)
 ```
 
-- **Solution**: Ensure you're running from project root directory
-- **Solution**: Verify all `__init__.py` files are present in pattern detection directories
-- **Solution**: Check Python path includes both `src/` and `src_pattern_aware/`
+**Pattern-Aware vs Standard Results Differ:**
 
-### Debug Information
-
-**Enable comprehensive debugging:**
-
-```bash
-# Windows Command Prompt
-set DEBUG_MODE=true
-set PATTERN_DEBUG=true
-python src_pattern_aware/main_pattern_aware.py
-
-# Alternative: Create .env file
-echo "DEBUG_MODE=true" > .env
-echo "PATTERN_DEBUG=true" >> .env
+```yaml
+# Enable hybrid mode for comparison
+pattern_processing:
+  mode: 'hybrid'
+  
+# Check debug images
+debug:
+  enabled: true
+  save_debug_images: true
+  steps_to_save:
+    - 'pattern_e_pattern_result'
+    - 'waterline_verification_analysis'
 ```
 
-**Expected debug output for successful detection:**
+### Debug Analysis
 
-```
-INFO - Starting Pattern-Aware Water Level Detection System
-INFO - Selected detection system: pattern_aware
-INFO - Pattern-Aware Water Level Detector Initialized
-INFO - Initialized 2 pattern detection methods
-DEBUG - Template matching found 0 marking instances
-DEBUG - Morphological detection found waterline at Y=245
-DEBUG - Selected candidate Y=245 from 2 candidates
-INFO - Pattern detection successful: 44.55cm
-```
+**Enable Pattern Debug Images:**
 
-**Expected debug output for hybrid mode:**
-
-```
-INFO - Selected detection system: hybrid
-INFO - Hybrid detector initialized with both standard and pattern-aware methods
-INFO - Hybrid processing: IMG_0154.JPG
-INFO - Running standard detection...
-INFO - Standard detection: 301.3cm (confidence: 0.886)
-INFO - Running pattern-aware detection...
-INFO - Pattern-aware detection: 44.55cm (confidence: 0.950)
-INFO - Result comparison:
-INFO -   Standard: 301.3cm (confidence: 0.886)
-INFO -   Pattern:  44.55cm (confidence: 0.950)
-INFO -   Difference: 144.2cm
-WARNING - Large discrepancy between detection methods (144.2cm)
-INFO - Selected pattern-aware result (higher confidence despite discrepancy)
+```yaml
+debug:
+  steps_to_save:
+    - 'pattern_e_pattern_result'          # E-pattern detection results
+    - 'pattern_template_matching_result'  # Template matching results
+    - 'waterline_verification_analysis'   # Waterline verification process
+    - 'waterline_candidate_regions'      # Candidate region analysis
 ```
 
-### Log Analysis
+**Log Analysis:**
 
-**Successful pattern detection:**
-
-```
-INFO - Processing image with pattern-aware detection: IMG_0154.JPG
-INFO - Template matching detector initialized (threshold: 0.7)
-INFO - Morphological detector initialized (h_kernel: [40, 1], v_kernel: [1, 40])
-DEBUG - Template matching found 0 marking instances
-DEBUG - Using template-free detection fallback
-DEBUG - Morphological detection found waterline at Y=245
-INFO - Pattern detection successful: 44.55cm
-```
-
-**Fallback to standard detection:**
-
-```
-WARNING - Pattern detection failed, falling back to standard methods
-INFO - Using standard detection as fallback
-INFO - Standard detection: 301.3cm (confidence: 0.886)
-```
-
-**Template detection (future - when implemented):**
-
-```
-INFO - Loaded 5 existing scale marking templates
-DEBUG - Template matching found 12 marking instances
-DEBUG - Morphological detection found waterline at Y=245
-DEBUG - Validation against template-suppressed region: PASSED
-INFO - Pattern-aware detection: 44.55cm (confidence: 0.970)
-```
-
-### Visual Debug Analysis
-
-When `PATTERN_DEBUG=true` is enabled, debug images are saved to:
-
-```
-data/debug/pattern_analysis/pattern_session_YYYYMMDD_HHMMSS/
-├── original/                    # Original input images
-├── template_matching/           # Template matching debug images
-├── morphological/              # Morphological operation results
-├── pattern_suppression/        # Before/after pattern suppression
-└── final_detection/            # Final detection results with annotations
-```
-
-**What to check in pattern debug images:**
-
-- **Template matching**: Verify detected markings are correctly identified
-- **Morphological**: Check horizontal vs vertical feature separation
-- **Pattern suppression**: Ensure scale markings are properly masked
-- **Final detection**: Confirm water interface is correctly identified
-
-## Performance
-
-### Current Performance (Prototype)
-
-- **Processing Speed:** ~3-5 seconds per image (not optimized)
-- **Memory Usage:** ~300-400MB (higher than standard system)
-- **Accuracy:** Variable - depends on scale type and markings
-- **Reliability:** High - fallback protection ensures results
-
-### Planned Improvements
-
-- **Speed Optimization:** Target 2x faster processing
-- **Memory Optimization:** Reduce memory usage by 50%
-- **Accuracy Validation:** Comprehensive accuracy testing
-- **Batch Processing:** Optimize for multiple image processing
-
-### Comparison with Standard System
-
-| Metric | Standard System | Pattern-Aware (Current) | Pattern-Aware (Target) |
-|--------|----------------|-------------------------|------------------------|
-| Speed | ~2-3 seconds | ~3-5 seconds | ~2-4 seconds |
-| Memory | ~200MB | ~300-400MB | ~250MB |
-| Accuracy (simple scales) | High | Medium | High |
-| Accuracy (complex scales) | Low | Medium-High | High |
-| Reliability | High | High (with fallback) | High |
+- Look for "E-pattern detection:" lines showing patterns found above water
+- Check "Underwater patterns:" messages indicating distortion boundary
+- Monitor "Scale measurement:" lines for 5cm calculations from clear patterns
+- Watch for fallback messages when insufficient patterns detected above water
 
 ## Development
 
-### Setting Up Development Environment
+### Architecture Overview
 
-1. **Clone and setup:**
-
-```bash
-git clone <repo-url>
-cd tide-level-img-proc-backup
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
+```
+src_pattern_aware/
+├── pattern_water_detector.py          # Main pattern-aware detector coordinator
+├── main_pattern_aware.py              # Entry point and orchestration
+├── hybrid_detector.py                 # Hybrid mode (pattern + standard)
+├── hybrid_waterline_analyzer.py       # Advanced waterline verification system
+├── detection_methods/                 # Core detection algorithms
+│   ├── e_pattern_detector.py         # Scale-invariant E-pattern sequential detection
+│   ├── template_matching.py          # Multi-scale template matching
+│   ├── morphological_detector.py     # Horizontal/vertical pattern separation
+│   └── integrated_detector.py        # Detection method coordination
+├── interactive_template_extractor.py  # Template extraction tool
+└── utils/                            # Shared pattern analysis utilities
 ```
 
-2. **Development workspace:**
+### Detection Flow Architecture
 
-```bash
-# Create development directories
-mkdir -p data/{pattern_templates,debug/pattern_analysis}
-mkdir -p logs
-
-# Verify pattern-aware system
-python -c "from src_pattern_aware import PatternWaterDetector; print('Development environment ready')"
+```
+┌─────────────────┐    ┌──────────────────────┐    ┌─────────────────────┐
+│   Image Input   │───▶│  E-Pattern Scanner   │───▶│  Pattern Validation │
+│                 │    │  (Multi-scale        │    │  (Consistency       │
+└─────────────────┘    │   Template Matching) │    │   Threshold Check)  │
+                       └──────────────────────┘    └─────────────────────┘
+                                 │                           │
+                                 ▼                           ▼
+┌─────────────────┐    ┌──────────────────────┐    ┌─────────────────────┐
+│ Last Valid      │───▶│  Baseline Reference  │───▶│ Symmetric Buffer    │
+│ E-Pattern       │    │  Point Calculation   │    │ Region Creation     │
+│ Identification  │    │  (bottom of pattern) │    │ (±60% pattern height)│
+└─────────────────┘    └──────────────────────┘    └─────────────────────┘
+                                 │                           │
+                                 ▼                           ▼
+┌─────────────────┐    ┌──────────────────────┐    ┌─────────────────────┐
+│ Pattern Count   │    │  Candidate Regions   │───▶│ Y-Axis Gradient     │
+│ Water Level     │    │  Definition          │    │ Analysis            │
+│ (5cm per pattern)│    │  (baseline + buffer) │    │ (within regions)    │
+└─────────────────┘    └──────────────────────┘    └─────────────────────┘
+         │                       │                           │
+         ▼                       ▼                           ▼
+┌─────────────────┐    ┌──────────────────────┐    ┌─────────────────────┐
+│ Candidate       │───▶│  Combined Metric     │───▶│  Final Result       │
+│ Clustering      │    │  Detection           │    │  Selection          │
+│ (5cm regions)   │    │  (Blue signature +   │    │  (Pattern vs        │
+└─────────────────┘    │   Gradient + Edge)   │    │   Hybrid vs         │
+                       └──────────────────────┘    │   Fallback)         │
+                                                   └─────────────────────┘
 ```
 
-### Development Workflow
+### Key Classes
 
-**Phase 2: Complete Detection Methods**
+- **PatternWaterDetector**: Main detection coordinator and entry point
+- **EPatternDetector**: Scale-invariant sequential pattern detection with 44 template variants
+- **HybridWaterlineAnalyzer**: Post-processing gradient analysis with combined metric detection
+- **TemplateManager**: Multi-scale template generation and management
+- **HybridDetector**: Orchestrates pattern-aware and standard detection comparison
 
-```bash
-# Template for new detection method
-cp src_pattern_aware/detection_methods/template_matching.py \
-   src_pattern_aware/detection_methods/frequency_analyzer.py
+## Example Processing Workflow
 
-# Update __init__.py imports
-# Implement detect_waterline() method
-# Add configuration options
-# Test with debug mode
-```
+The following images demonstrate the complete pattern-aware detection process on a real stadia rod image (IMG_0150), showing each major processing step from E-pattern detection to final waterline verification.
 
-**Phase 3: Pattern Analysis Components**
+### E-Pattern Detection Results
 
-```bash
-# Implement template extraction
-# Add pattern classification
-# Create template management system
-# Integrate with calibration workflow
-```
+![E-Pattern Detection](images/e_pattern_detection_IMG_0150.png)
 
-### Testing New Detection Methods
+**E-Pattern Sequential Detection**: Shows detected E-shaped patterns (green rectangles) above water surface. Each detected pattern represents 5cm of scale. The system uses multi-scale template matching to find patterns at their natural size, stopping when consecutive detection failures indicate the water boundary has been reached.
 
-```bash
-# Test individual method
-python -c "
-from src_pattern_aware.detection_methods.template_matching import TemplateMatchingDetector
-import cv2, yaml
-with open('config.yaml') as f: config = yaml.safe_load(f)
-detector = TemplateMatchingDetector(config)
-print(detector.get_detection_info())
-"
+### Waterline Candidate Regions
 
-# Test integration
-set PATTERN_DEBUG=true
-python src_pattern_aware/main_pattern_aware.py
+![Waterline Candidate Regions](images/waterline_candidate_regions_IMG_0150.jpg)
 
-# Compare with standard system
-set PATTERN_AWARE_MODE=hybrid
-python src_pattern_aware/main_pattern_aware.py
-```
+**Candidate Region Definition**: Displays systematic scan regions (yellow overlays) extending downward from the last detected E-pattern. The primary region uses a symmetric buffer around the baseline (bottom of last valid pattern), with additional extended regions providing comprehensive coverage for waterline detection.
 
-### Code Architecture Guidelines
+### Gradient Analysis Visualization
 
-**Detection Method Structure:**
+![Waterline Gradient Analysis](images/waterline_gradient_analysis_IMG_0150.jpg)
 
-```python
-class NewDetectionMethod:
-    def __init__(self, config):
-        # Load configuration
-        # Initialize parameters
-        # Setup logging
-        
-    def detect_waterline(self, scale_region):
-        # Main detection logic
-        # Return Y-coordinate or None
-        
-    def get_detection_info(self):
-        # Return method information
-```
+**Y-Axis Gradient Analysis**: Side-by-side comparison showing original image (left) and gradient magnitude visualization (right). Purple lines indicate detected waterline candidates within the systematic scan regions. The analysis uses vertical Sobel operators to detect horizontal transitions characteristic of waterline interfaces.
 
-**Configuration Integration:**
+### Clean Gradient Analysis
 
-```yaml
-detection:
-  pattern_aware:
-    new_method:
-      enabled: true
-      parameter1: value1
-      parameter2: value2
-```
+![Waterline Gradient Analysis Clean](images/waterline_gradient_analysis_clean_IMG_0150.jpg)
 
-## Contributing
+**Gradient Analysis Clean View**: Simplified visualization of gradient-based waterline detection showing only the essential detection regions and candidate lines. This clean view emphasizes the systematic approach to candidate region coverage and gradient-based transition detection.
 
-### Development Guidelines
+### Complete Verification Analysis
 
-1. **No emojis or icons** - All code, documentation, and logging must be text-only
-2. **Maintain separation** - Do not modify existing `src/` directory
-3. **Comprehensive testing** - Test all new detection methods thoroughly
-4. **Configuration-driven** - Make features configurable via YAML
-5. **Backward compatibility** - Ensure fallback to standard system always works
-6. **Modular design** - Each detection method should be independent
-7. **Error handling** - Graceful degradation and detailed logging
+![Waterline Verification Analysis](images/waterline_verification_analysis_IMG_0150.jpg)
 
-### Code Style
-
-- **Follow PEP 8** - Standard Python style guidelines
-- **Comprehensive logging** - Use structured logging throughout
-- **Type hints** - Add type annotations where applicable
-- **Detailed docstrings** - Document all classes and methods
-- **Error handling** - Include try/catch blocks and graceful degradation
-- **Configuration validation** - Validate all configuration parameters
-
-### Testing Requirements
-
-**Unit Tests:**
-
-```python
-# Test individual detection methods
-def test_template_matching_detector():
-    config = load_test_config()
-    detector = TemplateMatchingDetector(config)
-    result = detector.detect_waterline(test_scale_region)
-    assert result is not None
-    assert 0 <= result < test_scale_region.shape[0]
-```
-
-**Integration Tests:**
-
-```python
-# Test complete pattern-aware system
-def test_pattern_aware_integration():
-    detector = PatternWaterDetector(config, pixels_per_cm)
-    result = detector.process_image('test_image.jpg')
-    assert result['detection_method'] == 'pattern_aware'
-```
-
-**Comparison Tests:**
-
-```python
-# Compare with standard system
-def test_hybrid_comparison():
-    hybrid = HybridDetector(config, pixels_per_cm)
-    result = hybrid.process_image('test_image.jpg')
-    assert 'standard_result' in result['hybrid_data']
-    assert 'pattern_result' in result['hybrid_data']
-```
-
-### Documentation Requirements
-
-- **Update README** - Document all new features and configuration options
-- **Code documentation** - Comprehensive docstrings with examples
-- **Configuration documentation** - Explain all YAML parameters
-- **Usage examples** - Provide real-world usage scenarios
-- **Implementation notes** - Explain algorithmic decisions and trade-offs
-- **Limitation documentation** - Clearly state what doesn't work yet
-
-### Pull Request Guidelines
-
-1. **Feature branches** - Create feature-specific branches
-2. **Clear descriptions** - Explain what the PR accomplishes
-3. **Test coverage** - Include comprehensive tests
-4. **Documentation updates** - Update relevant documentation
-5. **Performance notes** - Document any performance implications
-6. **Breaking changes** - Clearly mark any API changes
-
-### Implementation Priorities
-
-**High Priority (Phase 2 completion):**
-
-1. Frequency Analysis Detector
-2. Line Segment Detector (LSD)
-3. Contour Analysis Detector
-4. Integrated Pattern Detector
-
-**Medium Priority (Phase 3):**
-
-1. Template extraction from calibration
-2. Pattern classification system
-3. Template management and persistence
-4. Enhanced calibration integration
-
-**Low Priority (Phase 4):**
-
-1. Performance optimization
-2. Advanced debug visualization
-3. Comprehensive testing suite
-4. Documentation improvements
-
-## License
-
-This project is licensed under the BSD 3-Clause License - same as the main water level detection system. See [LICENSE](../LICENSE.md) file for details.
-
-## Acknowledgments
-
-This pattern-aware detection system builds upon:
-
-- **Main water level detection system** - Provides the foundation and fallback capabilities
-- **OpenCV computer vision library** - Core image processing and computer vision operations
-- **NumPy scientific computing** - Numerical operations and array processing
-- **SciPy scientific library** - Advanced mathematical functions and algorithms
-
-**Pattern Recognition Techniques:**
-
-- **Template Matching** - Classical computer vision approach for pattern recognition
-- **Morphological Operations** - Mathematical morphology for image structure analysis
-- **Frequency Domain Analysis** - Signal processing techniques for pattern detection
-- **Line Segment Detection** - Geometric feature extraction methods
-- **Contour Analysis** - Shape-based object recognition approaches
-
-**Research Context:**
-This work is part of prototype research conducted at the [SenseLAB](http://senselab.tuc.gr/) of the [Technical University of Crete](https://www.tuc.gr/en/).
-
-## Support
-
-- **Issues**: Report bugs and request features via GitHub Issues
-- **Pattern-specific issues**: Use the "pattern-aware" label for issues related to this module
-- **Documentation**: Additional technical documentation in the `/documentation` directory
-- **Research collaboration**: Contact SenseLAB for research partnerships
-
-### Getting Help
-
-**For pattern-aware detection issues:**
-
-1. Check this README first
-2. Enable debug mode and check logs
-3. Try hybrid mode to compare with standard detection
-4. Create GitHub issue with "pattern-aware" label
-
-**For general system issues:**
-
-1. Refer to the main system [README](../README.md)
-2. Check standard system functionality first
-3. Use fallback to standard detection if needed
-
----
-
-*The Pattern-Aware Water Level Detection System is specifically designed for scales with complex markings and patterns. For simple scales without markings, the standard detection system may be more appropriate and efficient.*
+**Hybrid Waterline Verification**: Comprehensive analysis overlay showing E-pattern positions (green circles), systematic scan regions (yellow), gradient candidates (purple lines), and the final verified waterline position. This demonstrates the complete integration of pattern-based and gradient-based detection methods for improved accuracy.

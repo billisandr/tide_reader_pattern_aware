@@ -69,14 +69,9 @@ ehthumbs.db
 Thumbs.db
 
 # Documentation files (except README files)
-documentation/
+docs/
 
 # All markdown files except README files
 *.md
 !README.md
 !*/README.md
-
-# Specifically ignore documentation files that might be in root
-E_PATTERN_IMPLEMENTATION_SUMMARY.md
-ISSUES_AND_FUTURE_WORK.md
-CUSTOM_TEMPLATES_GUIDE.md
