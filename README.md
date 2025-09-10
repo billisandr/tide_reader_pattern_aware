@@ -2,7 +2,7 @@
 
 *Automated tide/water level detection using computer vision*
 
-> Disclaimer: This work is part of a non-funded prototype research idea conducted at the [SenseLAB](http://senselab.tuc.gr/) of the [TUC](https://www.tuc.gr/el/archi).
+> Disclaimer: This work is part of a non-funded prototype research idea conducted at the [SenseLAB](http://senselab.tuc.gr/) of the [Technical University of Crete](https://www.tuc.gr/el/archi).
 
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
@@ -27,17 +27,12 @@
 - [Development](#development)
 - [Troubleshooting](#troubleshooting)
 - [Deployment Options](#deployment-options)
-- [Contributing](#contributing)
-- [Performance](#performance)
 - [Architecture](#architecture)
 - [License](#license)
-- [Acknowledgments](#acknowledgments)
-- [Support](#support)
 
 ## Overview
 
 This system provides automated water/tide level detection and measurement using computer vision techniques. Designed for fixed camera setups with calibrated measurement scales, it processes images continuously and stores precise measurements in a database.
-
 
 ## Features
 
@@ -258,7 +253,6 @@ processing:
 
 > **Note:** This guide covers the essential workflow from setup to measurement results. For detailed configuration options, see the full documentation sections below.
 
-
 ## Installation
 
 ### Prerequisites
@@ -397,6 +391,29 @@ detection:
   water_hsv_lower: [100, 50, 50]   # Lower HSV bounds for water color detection
   water_hsv_upper: [130, 255, 255] # Upper HSV bounds for water color detection
   
+  # Pattern-aware detection configuration (used with pattern_processing.mode: 'pattern_aware')
+  pattern_aware:
+    # Hybrid waterline verification system
+    waterline_verification:
+      enabled: true                   # Enable hybrid waterline verification
+      min_pattern_confidence: 0.7     # Minimum confidence for waterline detection
+      gradient_kernel_size: 3         # Sobel kernel size for gradient analysis
+      gradient_threshold: 10          # Threshold for significant gradient changes
+      transition_search_height: 20    # Search height around suspicious regions (pixels)
+      
+      # Consolidated pattern analysis thresholds
+      pattern_analysis:
+        # Consecutive good pattern detection thresholds
+        scale_consistency_threshold: 0.15    # Scale factor consistency for consecutive good patterns (±15%)
+        size_consistency_threshold: 0.25     # Size consistency for consecutive good patterns (±25%) 
+        spacing_consistency_threshold: 0.50  # Spacing consistency for consecutive good patterns (±50%)
+        min_consecutive_patterns: 3          # Minimum consecutive good patterns required
+        
+        # Anomaly detection thresholds (applied after establishing baseline)
+        scale_anomaly_threshold: 0.15        # Scale factor change to flag suspicious regions (±15%)
+        size_anomaly_threshold: 0.20         # Size change to flag suspicious regions (±20%)
+        aspect_ratio_anomaly_threshold: 0.20 # Aspect ratio change to flag suspicious regions (±20%)
+        max_gap_ratio: 2.0                   # Max gap between patterns (2x expected spacing)
 
 processing:
   # Image processing settings
@@ -706,17 +723,6 @@ data/debug/
     └── waterline_within_scale/      # Waterline detection within scale bounds
 ```
 
-**Enhanced debug annotations include:**
-
-**Core Detection Visualizations:**
-
-- **Scale regions** highlighted with blue rectangles showing detection method
-- **Edge detection** results with Canny parameters and kernel information  
-- **Line detection** with Hough transform results and horizontal line filtering
-- **Gradient analysis** with Sobel operator visualization and peak detection
-- **Water detection** results with detected waterlines and confidence annotations
-- **Multi-method comparison** showing results from all detection algorithms
-
 **Advanced Color-Based Analysis:**
 
 - **Color masks** for scale types (blue, black markings; various backgrounds)
@@ -857,9 +863,9 @@ The system uses advanced RGB/HSV color filtering to detect various types of meas
 
 **Supported Scale Types:**
 
-- **Yellow scales with blue markings** (common tide gauges)
-- **White scales with black markings** (laboratory equipment)
-- **Red scales with white markings** (industrial applications)
+- **Yellow scales with blue markings** 
+- **White scales with black markings** 
+- **Red scales with white markings** 
 - **Custom color combinations** via configuration
 
 **Color Detection Features:**
@@ -886,7 +892,6 @@ scale_colors:
 
 The color detection can be **enabled/disabled per color** and includes **extensive debug visualization** showing mask generation, edge enhancement, and contour analysis.
 
-
 ## Data Export Options
 
 The system automatically exports measurement data in multiple formats based on your `config.yaml` settings. All exports are created in the `data/output/` directory with timestamped filenames to prevent overwrites.
@@ -906,7 +911,7 @@ output:
 
 - Creates `measurements_YYYYMMDD_HHMMSS.csv` files
 - Includes all measurement data in tabular format
-- `detection_method` column shows which method was actually used (e.g., 'enhanced_gradient', 'edge', 'color', 'gradient')
+- **New**: `detection_method` column shows which method was actually used (e.g., 'e_pattern_sequential', 'enhanced_gradient', 'standard', etc.)
 - Compatible with Excel, data analysis tools
 - Best for: Spreadsheet analysis, reporting, graphs, method performance tracking
 
@@ -952,33 +957,32 @@ output:
 
 ```
 tide-level-img-proc-backup/
-├── src/                            # Source code
-│   ├── calibration/               # Calibration tools
-│   │   ├── analyze_scale_photo.py # Interactive scale analysis tool
-│   │   └── quick_scale_analysis.py # Quick scale analysis utility
-│   ├── main.py                    # Main application entry point
-│   ├── water_level_detector.py    # Core processing logic
-│   ├── calibration.py             # Calibration management
-│   ├── database.py               # Database operations
-│   ├── debug_visualizer.py       # Debug image generation
-│   └── utils.py                  # Utility functions
-├── data/                         # Data directories
-│   ├── input/                    # Input images
-│   ├── processed/               # Processed images  
-│   ├── calibration/             # Calibration data
-│   ├── output/                  # Export files and databases
-│   └── debug/                   # Debug images (when enabled)
-├── docs/                        # Additional documentation
-├── logs/                        # Application logs
-├── config.yaml                 # System configuration
-├── requirements.txt            # Python dependencies
-├── Dockerfile                  # Container configuration
-├── docker-compose.yml         # Deployment configuration
-├── .env.example               # Environment template
-├── LICENSE.md                 # License file
-├── cleanup.bat                # Windows cleanup script
-├── cleanup.ps1               # PowerShell cleanup script
-└── README.md                 # Main documentation
+├── src/                             # Source code
+│   ├── calibration/                 # Calibration tools
+│   │   ├── analyze_scale_photo.py   # Interactive scale analysis tool        
+│   │   └── quick_scale_analysis.py  # Quick scale analysis utility
+│   ├── main.py                      # Main application entry point
+│   ├── water_level_detector.py      # Core processing logic
+│   ├── calibration.py               # Calibration management
+│   ├── database.py                  # Database operations
+│   ├── debug_visualizer.py          # Debug image generation
+│   └── utils.py                     # Utility functions
+├── data/                            # Data directories
+│   ├── input/                       # Input images
+│   ├── processed/                   # Processed images  
+│   ├── calibration/                 # Calibration data
+│   ├── output/                      # Export files
+│   └── debug/                       # Debug images (when enabled)
+├── logs/                            # Application logs
+├── config.yaml                      # System configuration
+├── requirements.txt                 # Python dependencies
+├── Dockerfile                       # Container configuration
+├── docker-compose.yml               # Deployment configuration
+├── .env.example                     # Environment template
+├── LICENSE.md                       # License file
+├── cleanup.bat                      # Windows cleanup script
+├── cleanup.ps1                      # PowerShell cleanup script
+└── README.md                        # Documentation
 ```
 
 ## Development
@@ -1033,7 +1037,6 @@ set CALIBRATION_MODE=true & python src/main.py
 # 5. Test color detection with debug
 set DEBUG_MODE=true & python src/main.py
 ```
-
 
 ## Troubleshooting
 
@@ -1097,7 +1100,7 @@ set DEBUG_MODE=true & python src/main.py
 - Check that `.env` file is being loaded
 - Verify display environment (especially in Docker)
 
-**🔴 Docker container won't start:**
+**Docker container won't start:**
 
 - Check SSL certificate files exist
 - Verify environment variables are set
@@ -1165,7 +1168,6 @@ docker compose -f docker-compose.yml up -d
 docker run -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix your-image
 ```
 
-
 ## Architecture
 
 ```
@@ -1184,10 +1186,3 @@ docker run -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix your-image
 ## License
 
 This project is licensed under the BSD 3-Clause License. See [LICENSE](LICENSE) file for details.
-
-
-
-**Research Context:**
-This work is part of prototype research conducted at the [SenseLAB](http://senselab.tuc.gr/) of the [Technical University of Crete](https://www.tuc.gr/en/).
-
-
