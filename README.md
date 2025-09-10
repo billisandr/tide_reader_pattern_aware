@@ -44,19 +44,15 @@ This system provides automated water/tide level detection and measurement using 
 - Tide monitoring stations
 - River water level monitoring
 - Laboratory water measurement
-- Environmental research projects
 
 ## Features
 
 - **Automated Processing**: Continuous monitoring of input directories
-- **Precise Calibration**: One-time setup for fixed camera-scale configurations  
-- **Advanced Scale Detection**: RGB/HSV color filtering for various scale types and markings
+- **Tool for Visual Calibration**: One-time setup for fixed camera-scale configurations  
 - **Multiple Detection Methods**: Edge detection, color-based analysis, and gradient methods
-- **🔴 Database Storage**: SQLite database with comprehensive measurement history
-- **Docker Ready**: Fully containerized deployment with HTTPS server
-- **GUI Interface**: Optional tkinter interface for directory selection
-- **🔴 Export Options**: CSV, JSON, and database export capabilities
-- **🔴 Web Interface**: HTTPS server for remote access and image upload
+- **GUI Interface**: Optional tkinter interface for input directory selection
+- **Database Export Options**: CSV, JSON, and database export capabilities
+- **Visual Debugging & Detailed Logging Option**: Step-by-step storage of annotated images for manual verification
 - **Reporting**: Automated measurement reports and visualizations
 
 ## Quick Use Guide
@@ -103,8 +99,9 @@ Edit `config.yaml` to set detection method and forced method:
 
 ```yaml
 detection:
-  method: 'integrated'                    # Run all methods
-  forced_method: 'enhanced_gradient'      # Force best method
+  method: 'integrated'              # Always run all 4 methods
+  forced_method: 'enhanced_gradient' # But use this method's result
+  # Options: 'enhanced_gradient', 'edge', 'color', 'gradient', null
   
   # Environment variables for testing
   USE_GUI_SELECTOR: true                  # Enable folder selection GUI
@@ -116,9 +113,10 @@ detection:
 
 ```bash
 # Windows Command Prompt
-set USE_GUI_SELECTOR=true
-set DEBUG_MODE=true
-set CALIBRATION_MODE=false
+set USE_GUI_SELECTOR=true        # Enable folder selection GUI
+set DEBUG_MODE=true              # Enable debug images and detailed logging
+set CALIBRATION_MODE=true        # Run calibration mode
+set PROCESS_INTERVAL=60          # Processing interval in seconds
 ```
 
 Or create a `.env` file:
@@ -127,6 +125,7 @@ Or create a `.env` file:
 USE_GUI_SELECTOR=true
 DEBUG_MODE=true  
 CALIBRATION_MODE=false
+PROCESS_INTERVAL=60
 ```
 
 ### Step 5: Run System Calibration
@@ -207,7 +206,6 @@ data/debug/debug_session_20250829_102135/
 - Scale boundaries are correctly detected (blue rectangles)
 - Waterline detection is accurate (green lines)
 - Final measurements are overlaid correctly
-- Multiple detection methods are compared
 
 ### Step 10: Review Output Data
 
@@ -263,34 +261,14 @@ processing:
 # - Clean processed images directory
 ```
 
-## Key Configuration Options
-
-**Force specific detection method while running all methods:**
-
-```yaml
-detection:
-  method: 'integrated'              # Always run all 4 methods
-  forced_method: 'enhanced_gradient' # But use this method's result
-  # Options: 'enhanced_gradient', 'edge', 'color', 'gradient', null
-```
-
-**Environment variables for testing:**
-
-```bash
-set DEBUG_MODE=true              # Enable debug images and detailed logging
-set USE_GUI_SELECTOR=true        # Enable folder selection GUI
-set CALIBRATION_MODE=true        # Run calibration mode
-set PROCESS_INTERVAL=60          # Processing interval in seconds
-```
-
-**Common troubleshooting:**
+## Common Troubleshooting
 
 - **Scale not detected:** Disable image resizing in config: `resize_width: null`
 - **Waterline inaccurate:** Use `forced_method: 'enhanced_gradient'` for clear water
 - **No images processed:** Check folder permissions and database path
 - **Calibration fails:** Ensure `data/calibration/calibration_image.jpg` exists
 
-This guide covers the essential workflow from setup to measurement results. For detailed configuration options, see the full documentation sections below.
+> **Note:** This guide covers the essential workflow from setup to measurement results. For detailed configuration options, see the full documentation sections below.
 
 ## Quick Start
 
@@ -568,18 +546,17 @@ debug:
 python src/calibration/analyze_scale_photo.py
 ```
 
-**The enhanced analysis tool provides:**
+**The interactive analysis tool provides:**
 
 - **Enhanced waterline detection**: Mark actual waterline position on scale for precise calibration
 - **Real measurement inputs**: Enter actual scale readings for accurate cm/pixel calculation
 - **Interactive scale boundary picker**: Click on full visible scale corners (even if partially underwater)
 - **Interactive color selection**: Click on scale background and marking colors (optional)
 - **Interactive water color sampling**: Click on water color for detection parameter calibration (optional)
-- **Automatic edge detection**: Finds potential scale edges using computer vision
 - **Color analysis**: Analyzes selected scale and water colors for RGB/HSV detection setup
 - **Configuration suggestions**: Generates optimal config.yaml values with custom color ranges
 
-**Enhanced Analysis Workflow:**
+**Interactive Analysis Workflow:**
 
 1. **Image display**: Shows calibration image window before requesting measurements
 2. **Scale measurement input**: Enter actual scale readings while viewing the image:
@@ -594,14 +571,6 @@ python src/calibration/analyze_scale_photo.py
 8. **Waterline gradient analysis**: Advanced analysis of color differences above/below waterline
 9. **Enhanced config generation**: Provides ready-to-use config.yaml values plus accurate calibration data
 10. **Summary display**: Clear summary of suggested config.yaml changes at the end
-
-**Key Advantages of Enhanced Workflow:**
-
-- **More Accurate Calibration**: Uses actual measured scale segment instead of estimated total height
-- **Waterline Aware**: Directly captures current water level during calibration
-- **Handles Partial Submersion**: Works with scales that are partially underwater
-- **Precise Measurements**: Real scale readings provide exact cm/pixel ratio
-- **Better Water Detection**: Waterline reference improves water level detection accuracy
 
 ### Calibration System
 
