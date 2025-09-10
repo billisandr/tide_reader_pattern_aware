@@ -70,8 +70,6 @@ Thumbs.db
 
 # Documentation files (except README files)
 docs/
-
-# All markdown files except README files
 *.md
 !README.md
 !*/README.md
