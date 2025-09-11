@@ -16,7 +16,7 @@
 - [Quick Start Guide](#quick-start-guide)
 - [Installation](#installation)
 - [Configuration](#configuration)
-- [Usage](#usage)
+- [Pattern Detection Guide](#pattern-detection-guide)
   - [E-Pattern Sequential Detection](#e-pattern-sequential-detection)
   - [Template Management](#template-management)
 - [Detection Methods](#detection-methods)
@@ -244,7 +244,7 @@ pattern_processing:
   template_directory: 'data/pattern_templates/scale_markings'
 ```
 
-## Usage
+## Pattern Detection Guide
 
 ### E-Pattern Sequential Detection
 

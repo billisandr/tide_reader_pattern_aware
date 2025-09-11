@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  water-level-processor:
+    build: 
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: water-level-measurement
+    volumes:
+      - ${IMAGE_SOURCE_DIR:-../data/input}:/app/data/input:ro
+      - ../data/output:/app/data/output
+      - ../data/calibration:/app/data/calibration
+      - ../data/debug:/app/data/debug
+      - ../logs:/app/logs
+      - ../config.yaml:/app/config.yaml:ro
+    environment:
+      - PROCESS_INTERVAL=${PROCESS_INTERVAL:-60}
+      - CALIBRATION_MODE=${CALIBRATION_MODE:-false}
+      - DB_PATH=${DB_PATH:-/app/data/output/measurements.db}
+      - DEBUG_MODE=${DEBUG_MODE:-false}
+      - USE_GUI_SELECTOR=${USE_GUI_SELECTOR:-false}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - water-level-net
+
+networks:
+  water-level-net:
+    driver: bridge

@@ -15,7 +15,7 @@
 - [Quick Use Guide](#quick-use-guide)
 - [Installation](#installation)
 - [Configuration](#configuration)
-- [Usage](#usage)
+- [Operation Guide and Instructions](#operation-guide-and-instructions)
   - [Enhanced Scale Configuration Analysis](#enhanced-scale-configuration-analysis)
   - [Calibration System](#calibration-system)
   - [Processing Images](#processing-images)
@@ -472,7 +472,7 @@ debug:
     - 'waterline_within_scale'       # Waterline detection within scale bounds
 ```
 
-## Usage
+## Operation Guide and Instructions
 
 ### Enhanced Scale Configuration Analysis
 
@@ -1132,6 +1132,8 @@ tail -f logs/water_level.log
 When troubleshooting detection issues, use visual debugging to verify scale detection, examine edge detection, validate line detection, and check final measurements.
 
 ## Deployment Options
+
+> **Important Notice**: The Docker functionality has not been thoroughly tested and may require adjustments for production use. Docker configuration is maintained to facilitate potential future needs for dockerized deployment scenarios. For reliable operation, local installation is recommended.
 
 ### Production Docker Deployment
 

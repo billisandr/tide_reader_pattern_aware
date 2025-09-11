@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  water-level-processor:
+    extends:
+      file: docker-compose.yml
+      service: water-level-processor
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: builder  # Use builder stage for development with build tools
+    volumes:
+      # Override volumes for development
+      - ..:/app  # Mount entire project for live development
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw  # X11 forwarding for GUI
+      # Keep data volumes
+      - ${IMAGE_SOURCE_DIR:-../data/input}:/app/data/input:ro
+      - ../data/output:/app/data/output
+      - ../data/calibration:/app/data/calibration
+      - ../data/debug:/app/data/debug
+      - ../logs:/app/logs
+    environment:
+      # Override environment for development
+      - DISPLAY=${DISPLAY}  # Enable GUI applications
+      - DEBUG_MODE=true
+      - USE_GUI_SELECTOR=true
+      - CALIBRATION_MODE=${CALIBRATION_MODE:-false}
+      - PROCESS_INTERVAL=${PROCESS_INTERVAL:-30}  # Faster processing for dev
+      - DB_PATH=/app/data/output/measurements.db
+    # Use host network for easier GUI access
+    network_mode: host
+    # Remove resource limits for development
+    deploy: {}
+    # Override command for development (optional)
+    # command: ["python", "-u", "src/main.py"]
+    
+    # Alternative: Interactive development mode
+    # stdin_open: true
+    # tty: true
+    # command: ["/bin/bash"]
