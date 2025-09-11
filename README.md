@@ -1,4 +1,4 @@
-# Water Level Measurement System
+# Water Level Measurement System: Edge & Color Detection
 
 *Automated tide/water level detection using computer vision*
 

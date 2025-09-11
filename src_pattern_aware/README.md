@@ -1,4 +1,4 @@
-# Water Level Measurement System - Pattern-Aware Approach
+# Water Level Measurement System: Pattern-Aware Matching
 
 *Advanced water level detection for scales with complex markings and patterns*
 
