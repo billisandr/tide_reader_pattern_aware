@@ -54,7 +54,7 @@ class TemplateMatchingDetector:
         
         # Check environment variables for template source override
         env_template_source = os.environ.get('TEMPLATE_SOURCE', '').lower()
-        if env_template_source in ['local', 'manager', 'both']:
+        if env_template_source in ['local']:
             self.template_source = env_template_source
             self.logger.info(f"Template source overridden by environment variable: {env_template_source}")
         else:
@@ -160,7 +160,6 @@ class TemplateMatchingDetector:
             if local_templates:
                 self.logger.debug(f"Retrieved {len(local_templates)} local templates")
         
-        # Note: Template manager functionality was removed (was stub implementation)
         
         # Apply max_templates limit
         if len(templates) > self.max_templates:

@@ -113,7 +113,7 @@ detection:
       enabled: true
       threshold: 0.75                 # Template match confidence
       max_templates: 10               # Maximum templates to store
-      template_source: 'manager'      # Options: 'local', 'manager', 'both'
+      template_source: 'local'        # Options: 'local'
       use_default_templates: true     # Create default stadia rod templates
       
       # Advanced template matching settings
@@ -140,19 +140,8 @@ detection:
       horizontal_kernel_size: [40, 1] # Horizontal feature detection
       vertical_kernel_size: [1, 40]   # Vertical feature suppression
     
-    frequency_analysis:
-      enabled: true
-      periodicity_threshold: 0.3      # Max periodicity for water interface
-    
-    line_detection:
-      enabled: true
-      min_line_length_ratio: 0.6      # Minimum line length (% of scale width)
-      max_angle_deviation: 10         # Max angle from horizontal (degrees)
-    
-    contour_analysis:
-      enabled: true
-      min_aspect_ratio: 10            # Minimum width/height ratio
-      min_width_ratio: 0.5            # Minimum width (% of scale width)
+    # Removed stub detector configurations:
+    # frequency_analysis, line_detection, contour_analysis
     
     # Hybrid waterline verification system
     waterline_verification:
@@ -253,9 +242,8 @@ debug:
       - 'pattern_e_pattern_result'  # E-pattern sequential detection results
       - 'pattern_template_matching_result'  # Template matching results
       - 'pattern_morphological_result'      # Morphological analysis results
-      - 'pattern_frequency_result'          # Frequency analysis results
-      - 'pattern_lsd_result'                # Line segment detection results
-      - 'pattern_contour_result'            # Contour analysis results
+      # Removed debug steps for stub detectors:
+      # pattern_frequency_result, pattern_lsd_result, pattern_contour_result
       - 'pattern_methods_summary'           # Summary of all pattern method results
       - 'pattern_water_detection'           # Final pattern-based water line detection
       - 'waterline_verification_analysis'   # Hybrid waterline verification process

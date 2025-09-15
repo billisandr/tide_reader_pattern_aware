@@ -159,7 +159,7 @@ detection:
       enabled: true
       threshold: 0.75                 # Template match confidence
       max_templates: 10               # Maximum templates to store
-      template_source: 'manager'      # Options: 'local', 'manager', 'both'
+      template_source: 'local'        # Options: 'local'
       use_default_templates: true     # Create default stadia rod templates
       
       # Advanced template matching preprocessing
@@ -188,19 +188,8 @@ detection:
       horizontal_kernel_size: [40, 1]   # Horizontal feature detection
       vertical_kernel_size: [1, 40]     # Vertical feature suppression
     
-    frequency_analysis:
-      enabled: true
-      periodicity_threshold: 0.3        # Max periodicity for water interface
-    
-    line_detection:
-      enabled: true
-      min_line_length_ratio: 0.6        # Minimum line length (% of scale width)
-      max_angle_deviation: 10           # Max angle from horizontal (degrees)
-    
-    contour_analysis:
-      enabled: true
-      min_aspect_ratio: 10              # Minimum width/height ratio
-      min_width_ratio: 0.5              # Minimum width (% of scale width)
+    # Legacy detection methods removed:
+    # frequency_analysis, line_detection, contour_analysis (were stub implementations)
     
     # Hybrid waterline verification system
     waterline_verification:
@@ -474,7 +463,6 @@ src_pattern_aware/
 - **PatternWaterDetector**: Main detection coordinator and entry point
 - **EPatternDetector**: Scale-invariant sequential pattern detection with 44 template variants
 - **HybridWaterlineAnalyzer**: Post-processing gradient analysis with combined metric detection
-- **TemplateManager**: Multi-scale template generation and management
 - **HybridDetector**: Orchestrates pattern-aware and standard detection comparison
 
 ## Example Processing Workflow

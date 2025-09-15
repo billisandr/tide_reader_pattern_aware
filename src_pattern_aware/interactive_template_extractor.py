@@ -385,7 +385,7 @@ def extract_e_templates():
         print("\nNext steps:")
         print("1. Update config.yaml to use extracted templates:")
         print("   template_matching:")
-        print("     template_source: 'manager'")
+        print("     template_source: 'local'")
         print("2. Test pattern-aware detection with your templates")
     else:
         print("No templates extracted. The built-in default templates will be used.")

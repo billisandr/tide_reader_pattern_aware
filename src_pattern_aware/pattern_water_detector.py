@@ -21,23 +21,13 @@ except ImportError:
 try:
     from .detection_methods.template_matching import TemplateMatchingDetector
     from .detection_methods.morphological_detector import MorphologicalDetector
-    from .detection_methods.frequency_analyzer import FrequencyAnalyzer
-    from .detection_methods.lsd_detector import LSDDetector
-    from .detection_methods.contour_analyzer import ContourAnalyzer
     from .detection_methods.integrated_detector import IntegratedPatternDetector
 except ImportError:
     from detection_methods.template_matching import TemplateMatchingDetector
     from detection_methods.morphological_detector import MorphologicalDetector
-    from detection_methods.frequency_analyzer import FrequencyAnalyzer
-    from detection_methods.lsd_detector import LSDDetector
-    from detection_methods.contour_analyzer import ContourAnalyzer
     from detection_methods.integrated_detector import IntegratedPatternDetector
 
-# Import pattern analysis utilities - handle both relative and absolute imports
-try:
-    from .pattern_analysis.pattern_classifier import PatternClassifier
-except ImportError:
-    from pattern_analysis.pattern_classifier import PatternClassifier
+# Pattern analysis utilities removed (were stub implementations)
 
 class PatternWaterDetector:
     """
@@ -77,7 +67,7 @@ class PatternWaterDetector:
         self.debug_viz = DebugVisualizer(config, enabled=debug_enabled, session_prefix='pattern_aware')
         
         # Initialize pattern analysis components
-        self.pattern_classifier = PatternClassifier(config)
+        # Pattern classifier removed (was stub implementation)
         
         # Initialize detection methods
         self._initialize_detection_methods()
@@ -101,21 +91,11 @@ class PatternWaterDetector:
         if self.pattern_config.get('morphological', {}).get('enabled', True):
             self.detection_methods['morphological'] = MorphologicalDetector(self.config)
         
-        # Frequency Analysis Detector
-        if self.pattern_config.get('frequency_analysis', {}).get('enabled', True):
-            self.detection_methods['frequency'] = FrequencyAnalyzer(self.config)
-        
-        # Line Segment Detector
-        if self.pattern_config.get('line_detection', {}).get('enabled', True):
-            self.detection_methods['lsd'] = LSDDetector(self.config)
-        
-        # Contour Analysis Detector
-        if self.pattern_config.get('contour_analysis', {}).get('enabled', True):
-            self.detection_methods['contour'] = ContourAnalyzer(self.config)
+        # Stub detectors removed (FrequencyAnalyzer, LSDDetector, ContourAnalyzer)
         
         # Integrated Pattern Detector (combines all methods)
         self.integrated_detector = IntegratedPatternDetector(
-            self.config, self.detection_methods, self.pattern_classifier, self.debug_viz, self.enhanced_calibration_data
+            self.config, self.detection_methods, None, self.debug_viz, self.enhanced_calibration_data
         )
         
         self.logger.info(f"Initialized {len(self.detection_methods)} pattern detection methods")
@@ -587,8 +567,8 @@ class PatternWaterDetector:
             if scale_region is None:
                 raise ValueError("Could not extract scale region from calibration image")
             
-            # Template extraction (template manager removed - was stub implementation)
-            template_count = 0  # Template manager was stub implementation returning 0
+            # Template extraction handled by individual detectors
+            template_count = 0
             
             if self.save_templates:
                 self.logger.info("Template saving handled by individual detectors")
@@ -606,7 +586,7 @@ class PatternWaterDetector:
             'processing_mode': self.processing_mode,
             'pattern_engine': self.pattern_engine,
             'available_methods': list(self.detection_methods.keys()),
-            'template_count': 0,  # Template manager was stub implementation
+            'template_count': 0,
             'fallback_enabled': self.fallback_enabled,
             'debug_enabled': self.debug_patterns
         }
