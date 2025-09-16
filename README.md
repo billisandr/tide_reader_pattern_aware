@@ -1,6 +1,6 @@
-# Water Level Measurement System: Pattern-Aware Matching
+# Water Level Measurement System: Pattern Matching
 
-*Advanced water level detection for scales with complex markings and patterns*
+*Pattern-matching based water level measurement from captured images of scales with repeatitive patterns*
 
 > Disclaimer: This work is part of a non-funded prototype research idea conducted at the [SenseLAB](http://senselab.tuc.gr/) of the [Technical University of Crete](https://www.tuc.gr/el/archi).
 
@@ -452,34 +452,34 @@ src/
 
 ## Example Processing Workflow
 
-The following images demonstrate the complete pattern-aware detection process on a real stadia rod image (IMG_0150), showing each major processing step from E-pattern detection to final waterline verification.
+The following images demonstrate the complete pattern-aware detection process on a real stadia rod image, showing each major processing step from E-pattern detection to final waterline verification.
 
 ### E-Pattern Detection Results
 
-![E-Pattern Detection](images/e_pattern_detection_IMG_0150.png)
+![E-Pattern Detection](demo/images/e_pattern_detection_IMG_0150.png)
 
 **E-Pattern Sequential Detection**: Shows detected E-shaped patterns (green rectangles) above water surface. Each detected pattern represents 5cm of scale. The system uses multi-scale template matching to find patterns at their natural size, stopping when consecutive detection failures indicate the water boundary has been reached.
 
 ### Waterline Candidate Regions
 
-![Waterline Candidate Regions](images/waterline_candidate_regions_IMG_0150.jpg)
+![Waterline Candidate Regions](demo/images/waterline_candidate_regions_IMG_0150.jpg)
 
 **Candidate Region Definition**: Displays systematic scan regions (yellow overlays) extending downward from the last detected E-pattern. The primary region uses a symmetric buffer around the baseline (bottom of last valid pattern), with additional extended regions providing comprehensive coverage for waterline detection.
 
 ### Gradient Analysis Visualization
 
-![Waterline Gradient Analysis](images/waterline_gradient_analysis_IMG_0150.jpg)
+![Waterline Gradient Analysis](demo/images/waterline_gradient_analysis_IMG_0150.jpg)
 
 **Y-Axis Gradient Analysis**: Side-by-side comparison showing original image (left) and gradient magnitude visualization (right). Purple lines indicate detected waterline candidates within the systematic scan regions. The analysis uses vertical Sobel operators to detect horizontal transitions characteristic of waterline interfaces.
 
 ### Clean Gradient Analysis
 
-![Waterline Gradient Analysis Clean](images/waterline_gradient_analysis_clean_IMG_0150.jpg)
+![Waterline Gradient Analysis Clean](demo/images/waterline_gradient_analysis_clean_IMG_0150.jpg)
 
 **Gradient Analysis Clean View**: Simplified visualization of gradient-based waterline detection showing only the essential detection regions and candidate lines. This clean view emphasizes the systematic approach to candidate region coverage and gradient-based transition detection.
 
 ### Complete Verification Analysis
 
-![Waterline Verification Analysis](images/waterline_verification_analysis_IMG_0150.jpg)
+![Waterline Verification Analysis](demo/images/waterline_verification_analysis_IMG_0150.jpg)
 
 **Waterline Verification**: Comprehensive analysis overlay showing E-pattern positions (green circles), systematic scan regions (yellow), gradient candidates (purple lines), and the final verified waterline position. This demonstrates the complete integration of pattern-based and gradient-based detection methods for improved accuracy.
