@@ -530,23 +530,9 @@ class PatternWaterDetector:
         return max(0, water_level_cm)  # Ensure non-negative
     
     def _fallback_to_standard_detection(self, image, image_path):
-        """Fallback to standard detection methods when pattern detection fails."""
-        try:
-            # Import standard detector
-            from src.water_level_detector import WaterLevelDetector
-            
-            # Create standard detector
-            standard_detector = WaterLevelDetector(
-                self.config, self.pixels_per_cm, 
-                self.enhanced_calibration_data, self.calibration_manager
-            )
-            
-            self.logger.info("Using standard detection as fallback")
-            return standard_detector.process_image(str(image_path))
-            
-        except Exception as e:
-            self.logger.error(f"Fallback to standard detection failed: {e}")
-            return None
+        """Fallback functionality removed - pattern-aware system is now standalone."""
+        self.logger.warning("Fallback to standard detection not available in standalone pattern-aware system")
+        return None
     
     def extract_and_save_templates(self, calibration_image_path):
         """

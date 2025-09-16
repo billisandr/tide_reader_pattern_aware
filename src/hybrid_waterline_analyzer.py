@@ -280,11 +280,19 @@ LEGEND CREATED: Generated automatically during waterline analysis
             )
             
             # Step 4: Save debug information if enabled
+            if self.logger:
+                self.logger.info(f"Debug check: debug_enabled={self.debug_enabled}, debug_viz={self.debug_viz is not None}, image_path={image_path is not None}")
+
             if self.debug_enabled and self.debug_viz and image_path:
+                if self.logger:
+                    self.logger.info("Saving hybrid waterline debug images...")
                 self._save_hybrid_debug_info(
-                    scale_region, e_pattern_matches, candidate_regions, 
+                    scale_region, e_pattern_matches, candidate_regions,
                     gradient_candidates, analysis_result, image_path
                 )
+            else:
+                if self.logger:
+                    self.logger.warning(f"Skipping debug images - debug_enabled: {self.debug_enabled}, debug_viz: {self.debug_viz is not None}, image_path: {image_path is not None}")
             
             return analysis_result
             

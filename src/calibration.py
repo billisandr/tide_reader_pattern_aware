@@ -14,29 +14,29 @@ class CalibrationManager:
         self.config = config
         self.logger = logging.getLogger(__name__)
         self.calibration_file = Path('data/calibration/calibration.yaml')
-    
+
     def is_calibrated(self):
         """Check if system is calibrated."""
         return self.calibration_file.exists()
-    
+
     def get_pixels_per_cm(self):
         """Load calibration data."""
         if not self.is_calibrated():
             return None
-        
+
         with open(self.calibration_file, 'r') as f:
             calib_data = yaml.safe_load(f)
-        
+
         return calib_data['pixels_per_cm']
-    
+
     def get_enhanced_calibration_data(self):
         """Load enhanced calibration data including waterline reference and gradient analysis."""
         if not self.is_calibrated():
             return None
-        
+
         with open(self.calibration_file, 'r') as f:
             calib_data = yaml.safe_load(f)
-        
+
         # Extract enhanced data if available
         enhanced_data = {
             'pixels_per_cm': calib_data['pixels_per_cm'],
@@ -48,18 +48,18 @@ class CalibrationManager:
             'scale_boundaries': None,
             'scale_markings': None
         }
-        
+
         # Check if this is enhanced waterline-aware calibration
         if calib_data.get('calibration_method') == 'enhanced_interactive_waterline':
             enhanced_data['waterline_reference'] = calib_data.get('reference_points', {}).get('waterline')
             enhanced_data['scale_measurements'] = calib_data.get('scale_measurements')
             enhanced_data['scale_boundaries'] = calib_data.get('scale_boundaries')
-            
+
             # Load critical waterline_gradient data for multi-color-space detection
             waterline_gradient = calib_data.get('waterline_gradient')
             if waterline_gradient:
                 enhanced_data['waterline_gradient'] = waterline_gradient
-                
+
                 # Load scale marking analysis data if available
                 scale_markings = waterline_gradient.get('scale_markings')
                 if scale_markings:
@@ -70,45 +70,45 @@ class CalibrationManager:
                     self.logger.debug(f"Marking contrast threshold: {scale_markings.get('marking_contrast_threshold', 'N/A')}")
                 else:
                     self.logger.warning("Enhanced calibration missing scale_markings data - artifact detection may be less accurate")
-                
+
                 self.logger.info("Loaded waterline gradient data for multi-color-space detection")
                 self.logger.debug(f"Above water gray mean: {waterline_gradient.get('above_water', {}).get('gray_mean', 'N/A')}")
                 self.logger.debug(f"Below water gray mean: {waterline_gradient.get('below_water', {}).get('gray_mean', 'N/A')}")
             else:
                 self.logger.warning("Enhanced calibration missing waterline_gradient data - multi-color-space detection unavailable")
-            
+
             self.logger.info("Using enhanced waterline-aware calibration data")
         else:
             self.logger.info("Using standard calibration data (no waterline reference)")
-        
+
         return enhanced_data
-    
+
     def run_calibration(self):
         """
         Run interactive calibration process.
         """
         self.logger.info("Starting calibration process...")
-        
+
         # Get calibration image using relative path
         calib_dir = Path('data/calibration')
         calib_dir.mkdir(parents=True, exist_ok=True)  # Ensure directory exists
-        
+
         images = list(calib_dir.glob('*.jpg')) + list(calib_dir.glob('*.png'))
-        
+
         if not images:
             self.logger.error(f"No calibration images found in {calib_dir.absolute()}/")
             self.logger.info("Please place calibration image as 'data/calibration/calibration_image.jpg'")
             return False
-        
+
         image_path = images[0]
         self.logger.info(f"Using calibration image: {image_path}")
-        
+
         # Load image
         image = cv2.imread(str(image_path))
         if image is None:
             self.logger.error("Failed to load calibration image")
             return False
-        
+
         # Apply same resize as processing pipeline to ensure coordinate consistency
         if self.config['processing']['resize_width']:
             height, width = image.shape[:2]
@@ -117,18 +117,18 @@ class CalibrationManager:
             image = cv2.resize(image, (new_width, new_height))
             self.logger.info(f"Resized calibration image: {width}x{height} -> {new_width}x{new_height}")
             self.logger.info("This ensures scale coordinates match processing pipeline")
-        
+
         # Method 1: Known scale height
         if self.config['scale']['total_height']:
             pixels_per_cm = self.calibrate_with_known_height(image)
         else:
             # Method 2: Interactive calibration
             pixels_per_cm = self.interactive_calibration(image)
-        
+
         if pixels_per_cm:
             # Save comprehensive calibration data
             from datetime import datetime
-            
+
             calib_data = {
                 'pixels_per_cm': float(pixels_per_cm),
                 'image_path': str(image_path).replace('\\', '/'),  # Normalize path separators
@@ -152,90 +152,90 @@ class CalibrationManager:
                     'expected_position': dict(self.config['scale']['expected_position'])
                 }
             }
-            
+
             # Ensure directory exists
             self.calibration_file.parent.mkdir(parents=True, exist_ok=True)
-            
+
             with open(self.calibration_file, 'w') as f:
                 f.write('# Calibration data - automatically generated by interactive calibration\n')
                 f.write('# This file is updated each time CALIBRATION_MODE=true is run\n')
                 f.write('# Values are derived from config.yaml settings and image analysis\n\n')
                 yaml.dump(calib_data, f, default_flow_style=False, sort_keys=False)
-            
+
             self.logger.info(f"Calibration saved: {pixels_per_cm:.2f} pixels/cm")
             return True
-        
+
         return False
-    
+
     def calibrate_with_known_height(self, image):
         """
         Calibrate using known scale height.
         """
         height_cm = self.config['scale']['total_height']
-        
+
         # Detect scale in image
         scale_pixels = self.detect_scale_height_pixels(image)
-        
+
         if scale_pixels:
             pixels_per_cm = scale_pixels / height_cm
             self.logger.info(f"Detected scale: {scale_pixels} pixels = {height_cm}cm")
             return pixels_per_cm
-        
+
         self.logger.error("Could not detect scale in calibration image")
         return None
-    
+
     def detect_scale_height_pixels(self, image):
         """
         Detect the scale and measure its height in pixels.
         """
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         edges = cv2.Canny(gray, 50, 150)
-        
+
         # Find contours
         contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
+
         # Find the tallest vertical object (likely the scale)
         max_height = 0
         for contour in contours:
             x, y, w, h = cv2.boundingRect(contour)
             if h > w * 2 and h > max_height:  # Vertical object
                 max_height = h
-        
+
         return max_height if max_height > 100 else None
-    
+
     def interactive_calibration(self, image):
         """
         Interactive calibration with user input.
         """
         self.logger.info("Interactive calibration: Click top and bottom of scale")
-        
+
         points = []
-        
+
         def mouse_callback(event, x, y, flags, param):
             if event == cv2.EVENT_LBUTTONDOWN:
                 points.append((x, y))
                 cv2.circle(image, (x, y), 5, (0, 255, 0), -1)
                 cv2.imshow('Calibration', image)
-        
+
         cv2.namedWindow('Calibration')
         cv2.setMouseCallback('Calibration', mouse_callback)
         cv2.imshow('Calibration', image)
-        
+
         self.logger.info("Click on top of scale, then bottom of scale. Press 'q' when done.")
-        
+
         while len(points) < 2:
             key = cv2.waitKey(1) & 0xFF
             if key == ord('q'):
                 break
-        
+
         cv2.destroyAllWindows()
-        
+
         if len(points) >= 2:
             # Calculate pixel distance
             pixel_height = abs(points[1][1] - points[0][1])
             height_cm = float(input("Enter the actual height in cm: "))
-            
+
             pixels_per_cm = pixel_height / height_cm
             return pixels_per_cm
-        
+
         return None

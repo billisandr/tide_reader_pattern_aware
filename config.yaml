@@ -95,10 +95,9 @@ detection:
   water_hsv_lower: [31, 0, 0]
   water_hsv_upper: [61, 92, 112]
   
-  # NEW: Pattern-aware detection system
+  # Pattern-aware detection system (standalone)
   pattern_aware:
     engine: 'integrated_pattern'      # Pattern detection engine
-    fallback_to_standard: true        # Fall back to standard methods if pattern fails
     
     # E-pattern sequential detection settings
     e_pattern_detection:
@@ -185,9 +184,9 @@ processing:
   save_processed_images: true
   image_format: 'jpg'
 
-# NEW: Pattern-aware processing mode
+# Pattern-aware processing mode (standalone system)
 pattern_processing:
-  mode: 'pattern_aware'               # Options: 'standard', 'pattern_aware', 'hybrid'
+  mode: 'pattern_aware'               # Pattern-aware only (standalone system)
   debug_patterns: true                # Save pattern analysis debug images
   save_templates: true                # Save extracted templates for reuse
   template_directory: 'data/pattern_templates/scale_markings'
@@ -207,7 +206,7 @@ debug:
   annotation_thickness: 2
   font_scale: 0.7
   steps_to_save:
-      # Standard detection debugging steps (used by both standard and pattern-aware detectors)
+      # Pattern-aware detection debugging steps
       - 'original'
       - 'preprocessed'
       - 'color_mask_blue'           # NEW - see blue color detection
@@ -233,9 +232,8 @@ debug:
       - 'gradient_analysis'           # NEW - vertical gradient analysis (Sobel)
       - 'integrated_detection_methods'  # NEW - multi-method detection visualization
       - 'final_result'
-      
-      # Pattern-aware specific debugging steps (filtered out for standard detector)
-      # These are only used when pattern-aware detection is enabled
+
+      # Pattern-aware specific debugging steps
       - 'pattern_original'          # Original image for pattern processing
       - 'pattern_scale_region'      # Extracted scale region for pattern analysis
       - 'pattern_preprocessing'     # Scale region preprocessed for pattern detection

@@ -8,11 +8,17 @@ Prioritizes E-pattern sequential detection when available.
 import cv2
 import logging
 
-# Import E-pattern detector
-try:
-    from .e_pattern_detector import EPatternDetector
-except ImportError:
-    from e_pattern_detector import EPatternDetector
+# Import E-pattern detector using absolute import
+import importlib.util
+import os
+
+# Dynamically import E-pattern detector
+current_dir = os.path.dirname(__file__)
+e_pattern_path = os.path.join(current_dir, 'e_pattern_detector.py')
+spec = importlib.util.spec_from_file_location("e_pattern_detector", e_pattern_path)
+e_pattern_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(e_pattern_module)
+EPatternDetector = e_pattern_module.EPatternDetector
 
 class IntegratedPatternDetector:
     """
@@ -96,9 +102,24 @@ class IntegratedPatternDetector:
                     verification_config = self.config.get('detection', {}).get('pattern_aware', {}).get('waterline_verification', {})
                     if verification_config.get('enabled', False):
                         try:
-                            from ..hybrid_integration import analyze_e_pattern_waterline, apply_hybrid_waterline_improvement
-                            
-                            self.logger.info("Running optional hybrid waterline verification")
+                            # Import using importlib with absolute path
+                            import importlib.util
+                            import os
+
+                            # Get the path to hybrid_integration.py in the parent directory
+                            parent_dir = os.path.dirname(os.path.dirname(__file__))
+                            hybrid_integration_path = os.path.join(parent_dir, 'hybrid_integration.py')
+
+                            # Load the module dynamically
+                            spec = importlib.util.spec_from_file_location("hybrid_integration", hybrid_integration_path)
+                            hybrid_integration = importlib.util.module_from_spec(spec)
+                            spec.loader.exec_module(hybrid_integration)
+
+                            # Get the functions we need
+                            analyze_e_pattern_waterline = hybrid_integration.analyze_e_pattern_waterline
+                            apply_hybrid_waterline_improvement = hybrid_integration.apply_hybrid_waterline_improvement
+
+                            self.logger.info(f"Running optional hybrid waterline verification - debug_viz available: {self.debug_viz is not None}")
                             
                             # Perform hybrid analysis
                             hybrid_analysis_result = analyze_e_pattern_waterline(

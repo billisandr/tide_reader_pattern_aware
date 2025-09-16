@@ -14,7 +14,7 @@ This integration:
 
 import logging
 from typing import Dict, List, Optional, Any
-from .hybrid_waterline_analyzer import HybridWaterlineAnalyzer
+from hybrid_waterline_analyzer import HybridWaterlineAnalyzer
 
 
 def analyze_e_pattern_waterline(config: Dict[str, Any],
@@ -149,7 +149,17 @@ def example_integration_with_e_pattern_detector(config, scale_region, image_path
     2. Optionally run hybrid analysis as post-processing
     3. Use improved result or stick with original
     """
-    from .detection_methods.e_pattern_detector import EPatternDetector
+    # Import E-pattern detector dynamically
+    import importlib.util
+    import os
+
+    # Get the path to e_pattern_detector
+    current_dir = os.path.dirname(__file__)
+    e_pattern_path = os.path.join(current_dir, 'detection_methods', 'e_pattern_detector.py')
+    spec = importlib.util.spec_from_file_location("e_pattern_detector", e_pattern_path)
+    e_pattern_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(e_pattern_module)
+    EPatternDetector = e_pattern_module.EPatternDetector
     
     # Step 1: Run original E-pattern detection (unchanged)
     e_detector = EPatternDetector(config)
