@@ -30,7 +30,7 @@
 
 The pattern-aware system provides specialized water level detection by using pattern recognition to identify repetitive scale markings (such as E-patterns on stadia rods) above the water surface. It leverages the key observation that scale patterns underwater appear distorted due to refraction and optical effects, while patterns above water remain clear and detectable.
 
-**Key Innovation:** Instead of trying to detect the water interface directly, this system locates repetitive, non-distorted scale markings above the water line and calculates the water level based on the position of the lowest detectable pattern. This approach significantly reduces erroneous waterline detections caused by scale markings, reflections, or visual noise.
+**Key Approach:** Instead of trying to detect the water interface directly, this system locates repetitive, non-distorted scale markings above the water line and calculates the water level based on the position of the lowest detectable pattern. This approach significantly reduces erroneous waterline detections caused by scale markings, reflections, or visual noise.
 
 ## Features
 
@@ -324,7 +324,7 @@ python src/extract_templates.py --scale-type stadia_rod
    - Select best candidate from highest-density cluster
    - Cross-validate with original E-pattern water level calculation
 
-**Key Innovation**: Uses bottom of last detectable E-pattern as physical reference point for waterline search, ensuring search occurs in the correct location where patterns transition from clear (above water) to distorted (underwater).
+**Key Approach**: Uses bottom of last detectable E-pattern as physical reference point for waterline search, ensuring search occurs in the correct location where patterns transition from clear (above water) to distorted (underwater).
 
 ### Integrated Detector Priority Chain
 
