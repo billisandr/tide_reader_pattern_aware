@@ -466,17 +466,17 @@ The following images demonstrate the complete pattern-aware detection process on
 
 **Candidate Region Definition**: Displays systematic scan regions (yellow overlays) extending downward from the last detected E-pattern. The primary region uses a symmetric buffer around the baseline (bottom of last valid pattern), with additional extended regions providing comprehensive coverage for waterline detection.
 
+### Gradient Analysis (No Annotations)
+
+![Waterline Gradient Analysis Clean](demo/images/waterline_gradient_analysis_clean_IMG_0150.jpg)
+
+**Gradient Analysis Clean View**: Simplified visualization of gradient-based waterline detection showing only the essential detection regions and candidate lines. This clean view emphasizes the systematic approach to candidate region coverage and gradient-based transition detection.
+
 ### Gradient Analysis Visualization
 
 ![Waterline Gradient Analysis](demo/images/waterline_gradient_analysis_IMG_0150.jpg)
 
 **Y-Axis Gradient Analysis**: Side-by-side comparison showing original image (left) and gradient magnitude visualization (right). Purple lines indicate detected waterline candidates within the systematic scan regions. The analysis uses vertical Sobel operators to detect horizontal transitions characteristic of waterline interfaces.
-
-### Clean Gradient Analysis
-
-![Waterline Gradient Analysis Clean](demo/images/waterline_gradient_analysis_clean_IMG_0150.jpg)
-
-**Gradient Analysis Clean View**: Simplified visualization of gradient-based waterline detection showing only the essential detection regions and candidate lines. This clean view emphasizes the systematic approach to candidate region coverage and gradient-based transition detection.
 
 ### Complete Verification Analysis
 
